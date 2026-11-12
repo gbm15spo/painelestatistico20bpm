@@ -4,12 +4,13 @@ Sem comandos de exclusão em massa. Sem dados semeados e sem credenciais no cód
 """
 from __future__ import annotations
 import datetime as dt
-import hashlib, hmac, io, json, os, re, secrets, time
+import base64, hashlib, hmac, io, json, os, re, secrets, time
 from pathlib import Path
 from flask import Flask, Response, request, jsonify, send_from_directory
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
+from werkzeug.exceptions import HTTPException
 from core import validate_record, record_from_row, pdf_preview, COUNT_FIELDS
 
 HERE = Path(__file__).resolve().parent
@@ -21,6 +22,20 @@ ADMIN_PASSWORD_HASH = os.environ.get('ADMIN_PASSWORD_HASH', '').strip()
 SESSION_SECONDS = 12 * 3600
 _engine = None
 _init_done = False
+
+
+def _inline_hashes():
+    # A página é um único index.html com <style> e <script> embutidos; a CSP só libera exatamente esse conteúdo.
+    try:
+        html = (HERE / 'index.html').read_text(encoding='utf-8')
+    except OSError:
+        return '', ''
+    h = lambda s: "'sha256-" + base64.b64encode(hashlib.sha256(s.encode('utf-8')).digest()).decode() + "'"
+    return (' '.join(h(m) for m in re.findall(r'<script>(.*?)</script>', html, re.S)),
+            ' '.join(h(m) for m in re.findall(r'<style>(.*?)</style>', html, re.S)))
+
+
+SCRIPT_HASHES, STYLE_HASHES = _inline_hashes()
 
 
 def database():
@@ -55,6 +70,11 @@ def initialize():
         )'''))
         c.execute(text('''CREATE TABLE IF NOT EXISTS draft (
           username TEXT PRIMARY KEY, body TEXT NOT NULL, updated_at TEXT NOT NULL
+        )'''))
+        c.execute(text('''CREATE TABLE IF NOT EXISTS geo (
+          city TEXT NOT NULL, neighborhood TEXT NOT NULL,
+          lat DOUBLE PRECISION NOT NULL, lon DOUBLE PRECISION NOT NULL,
+          PRIMARY KEY(city, neighborhood)
         )'''))
         c.execute(text('''CREATE TABLE IF NOT EXISTS login_limits (
           key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, window_started BIGINT NOT NULL
@@ -159,7 +179,7 @@ def headers(resp):
     resp.headers['X-Content-Type-Options']='nosniff'
     resp.headers['Referrer-Policy']='no-referrer'
     resp.headers['X-Frame-Options']='DENY'
-    resp.headers['Content-Security-Policy']="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+    resp.headers['Content-Security-Policy']=f"default-src 'self'; script-src 'self' https://unpkg.com {SCRIPT_HASHES}; style-src 'self' https://unpkg.com {STYLE_HASHES}; img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com; connect-src 'self' https://nominatim.openstreetmap.org; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
     resp.headers['Cache-Control']='no-store'
     return resp
 
@@ -178,6 +198,8 @@ def duplicate(err):return jsonify({'error':'Número e data já cadastrados. Veri
 
 @app.errorhandler(Exception)
 def internal(err):
+    if isinstance(err,HTTPException):
+        return jsonify({'error':'Não encontrado.' if err.code==404 else (err.description or 'Requisição inválida.')}),err.code or 500
     if isinstance(err,RuntimeError) and 'Banco não configurado' in str(err):
         return jsonify({'error':'Banco de dados não configurado. Solicite ao administrador a configuração do PostgreSQL (DATABASE_URL).'}),503
     app.logger.exception('Erro interno no painel')
@@ -193,6 +215,36 @@ def api_session():
 @app.get('/api/records')
 def api_records():
     return jsonify({'records':get_records(private=bool(session())),'admin':bool(session())})
+
+
+@app.get('/api/geo')
+def api_geo():
+    # Posição (lat/lon) de cada bairro para o mapa de calor. Não contém dados de ocorrências.
+    initialize()
+    with database().connect() as c:
+        rows=c.execute(text('SELECT city,neighborhood,lat,lon FROM geo')).fetchall()
+    return jsonify({'places':[dict(x._mapping) for x in rows]})
+
+
+@app.post('/api/geo')
+def api_geo_save():
+    if not admin():return no_access()
+    body=json_body()
+    places=body.get('places') if isinstance(body,dict) else None
+    if not isinstance(places,list) or not 1<=len(places)<=200:raise ValueError('Lista de locais inválida.')
+    ok=[]
+    for p in places:
+        if not isinstance(p,dict):raise ValueError('Local inválido.')
+        city=str(p.get('city') or '').strip();nb=str(p.get('neighborhood') or '').strip()
+        try:lat=float(p.get('lat'));lon=float(p.get('lon'))
+        except (TypeError,ValueError):raise ValueError('Coordenadas inválidas.')
+        if not nb or len(city)>100 or len(nb)>100 or not (-90<=lat<=90 and -180<=lon<=180):raise ValueError('Local inválido.')
+        ok.append({'city':city,'nb':nb,'lat':lat,'lon':lon})
+    with database().begin() as c:
+        for p in ok:
+            c.execute(text('''INSERT INTO geo(city,neighborhood,lat,lon) VALUES(:city,:nb,:lat,:lon)
+              ON CONFLICT(city,neighborhood) DO UPDATE SET lat=excluded.lat,lon=excluded.lon'''),p)
+    return jsonify({'ok':True,'saved':len(ok)})
 
 
 @app.get('/api/draft')
@@ -216,6 +268,15 @@ def api_export():
     from excel_export import build_xlsx
     b=build_xlsx(get_records(True))
     return Response(b,content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',headers={'Content-Disposition':'attachment; filename="estatisticas_operacionais_20bpm.xlsx"'})
+
+
+@app.get('/api/export.pdf')
+def api_export_pdf():
+    s=session()
+    if not s:return no_access('Somente o administrador pode exportar dados completos.')
+    from pdf_export import build_pdf
+    b=build_pdf(get_records(True),s['username'])
+    return Response(b,content_type='application/pdf',headers={'Content-Disposition':'attachment; filename="planilha_ocorrencias_20bpm.pdf"'})
 
 
 @app.post('/api/login')
@@ -325,13 +386,11 @@ def api_record_delete(uid):
 
 @app.route('/')
 @app.route('/index.html')
-def home():return send_from_directory(HERE/'static','index.html')
+def home():return send_from_directory(HERE,'index.html')
 
 
 @app.route('/<path:filename>')
 def files(filename):
-    if filename in ('style.css','app.js','logo.png'):
-        return send_from_directory(HERE/'static',filename)
     return no_access('Não encontrado.',404)
 
 

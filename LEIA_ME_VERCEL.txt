@@ -20,6 +20,18 @@ COMO PUBLICAR
 7. Acesse seu endereco https://...vercel.app : visitantes consultam estatísticas.
    Você clica em Acesso administrativo e usa usuário e nova senha.
 
+ATUALIZAÇÃO (interface completa)
+- A página inteira está em UM arquivo: index.html (estilo, script e brasão embutidos). Ele fica na raiz do
+  repositório, junto com app.py, core.py, excel_export.py, pdf_export.py e requirements.txt. Não há pasta static.
+- Painel público: indicadores, gráficos e MAPA DE CALOR por bairro (mapa real, OpenStreetMap).
+  O administrador logado localiza os bairros automaticamente; os não encontrados podem ser
+  posicionados clicando no bairro e depois no ponto do mapa.
+- Somente administrador: cadastro, importação por PDF, edição/exclusão, RELATÓRIOS (dia, semana, mês,
+  trimestre, ano ou entre datas; filtros por tipo de ocorrência, CIA, cidade e bairro; comparação com
+  período anterior, mesmo período do ano anterior, outro período ou sem comparação; botão
+  Imprimir / Salvar em PDF), PRODUTIVIDADE POR CIA (marcar CIAs; total e por tipo de ocorrência),
+  planilha Excel, PLANILHA EM PDF com todos os dados e backup JSON.
+
 OBSERVAÇÕES
 - São necessários três segredos/configurações: DATABASE_URL (ou POSTGRES_URL),
   ADMIN_USERNAME e ADMIN_PASSWORD_HASH. Sem banco configurado, o sistema avisa erro 503.
@@ -30,7 +42,7 @@ OBSERVAÇÕES
 - O sistema não tem apagamento de todos os registros, somente exclusão individual.
 - Confira os dados de PDF antes de confirmar a importação. PDFs digitalizados não são
   reconhecidos nesta versão (falta OCR).
-- O mapa de calor é um quadro de intensidade POR BAIRRO, não um mapa geográfico.
+- O mapa de calor usa mapa do OpenStreetMap; só o nome do bairro e da cidade é consultado para localizar.
 - Guarde backups JSON; o PostgreSQL é um serviço separado e pode ter custos ou limites.
 - Não publique relatórios sigilosos nem dados pessoais no dashboard público.
   A implantação deve respeitar as normas de acesso, proteção de dados e uso da PMBA.

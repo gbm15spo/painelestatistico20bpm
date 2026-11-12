@@ -68,7 +68,12 @@ def pdf_preview(data: bytes):
         resp = re.search(r'RESPONS[ÁA]VEL\s*:\s*([^\n]+)', header, re.I)
         responsible = resp.group(1).strip() if resp else ''
         cia_match = re.search(r'\b(\d{1,2})\s*[ªa°]\s*CIA\b', responsible, re.I)
-        cia = (cia_match.group(1) + 'ª CIA') if cia_match else 'Não informada (avulsa)'
+        if cia_match:
+            cia = cia_match.group(1) + 'ª CIA'
+        elif re.search(r'\bCETO\b', responsible, re.I):
+            cia = 'CETO'  # ex.: "CETO/3º PEL MOTOPATRULHAMENTO"
+        else:
+            cia = 'Não informada (avulsa)'
         warnings = []
         if cia == 'Não informada (avulsa)':
             if 'MOTOPATRULHAMENTO' in normal(piece) or 'MOTO PATRULHAMENTO' in normal(piece):
