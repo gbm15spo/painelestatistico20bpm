@@ -66,8 +66,9 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .alert.error{background:#fbeaea;color:var(--err);border-color:#f0c6c3}
 .alert.info{background:#f1ecdc;color:var(--brand);border-color:#d9cfb2}
 
-.filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end}
+.filters{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:end}
 .filters.flat{grid-template-columns:repeat(4,minmax(0,1fr))}
+#tab-relatorios .filters{grid-template-columns:repeat(5,minmax(0,1fr))}
 .checks{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 #pCias{display:flex;flex-wrap:wrap;gap:6px 14px;flex:1 1 260px}
 #pCias label{flex-direction:row;align-items:center;gap:6px;color:var(--text);font-size:.92rem}
@@ -193,7 +194,7 @@ dialog h2{margin-bottom:14px}
 .foot{text-align:center;padding:0 16px 24px}
 
 @media (max-width:860px){
-  .filters,.filters.flat{grid-template-columns:1fr 1fr}
+  .filters,.filters.flat,#tab-relatorios .filters{grid-template-columns:1fr 1fr}
   .charts,.grid2{grid-template-columns:1fr}
   .grid{grid-template-columns:1fr 1fr}
   .grid.ind{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -258,6 +259,7 @@ dialog h2{margin-bottom:14px}
       <label>Até<input type="date" id="fTo"></label>
       <label>CIA<select id="fCia"><option value="">Todas</option></select></label>
       <label>Cidade<select id="fCity"><option value="">Todas</option></select></label>
+      <label>Tipo de ocorrência<select id="fType"><option value="">Todos</option></select></label>
       <label>Classificação<select id="fCat">
         <option value="">Todas</option>
         <option value="homicidio">Homicídio</option>
@@ -545,7 +547,7 @@ function renderFilters() {
   fillSelect($('#rCity'), uniq(S.records.map(r => r.city)));
   fillSelect($('#rNb'), uniq(S.records.map(r => r.neighborhood)), 'Todos');
   const kinds = [...S.kinds].sort((x, y) => x[1].localeCompare(y[1], 'pt-BR'));
-  fillSelect($('#rType'), kinds, 'Todos'); fillSelect($('#pType'), kinds, 'Todos');
+  fillSelect($('#rType'), kinds, 'Todos'); fillSelect($('#pType'), kinds, 'Todos'); fillSelect($('#fType'), kinds, 'Todos');
 }
 function renderLists() {
   const set = (id, vals) => { $(id).innerHTML = vals.map(v => `<option value="${esc(v)}">`).join(''); };
@@ -554,9 +556,9 @@ function renderLists() {
   set('#dlBairro', uniq(S.records.map(r => r.neighborhood)));
 }
 function filtered() {
-  const f = { from: $('#fFrom').value, to: $('#fTo').value, cia: $('#fCia').value, city: $('#fCity').value, cat: $('#fCat').value };
+  const f = { from: $('#fFrom').value, to: $('#fTo').value, cia: $('#fCia').value, city: $('#fCity').value, cat: $('#fCat').value, type: $('#fType').value };
   return S.records.filter(r => (!f.from || r.date >= f.from) && (!f.to || r.date <= f.to)
-    && (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.cat || r.crime_category === f.cat));
+    && (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.cat || r.crime_category === f.cat) && (!f.type || kindKey(r.kind) === f.type));
 }
 function hbars(box, entries, max = 10) {
   entries = entries.filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, max);
@@ -636,7 +638,7 @@ function renderMap(rs) {
   if (!map) {
     map = L.map(box, { scrollWheelZoom: false }).setView([-9.406, -38.215], 12);
     map.attributionControl.setPrefix(false);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap', referrerPolicy: 'strict-origin-when-cross-origin' }).addTo(map);
     marks = L.layerGroup().addTo(map);
     map.on('click', onMapClick);
   }
@@ -1168,7 +1170,7 @@ function bind() {
   $('#btnLogout').addEventListener('click', doLogout);
   $('#formLogin').addEventListener('submit', doLogin);
   $$('#tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
-  ['#fFrom', '#fTo', '#fCia', '#fCity', '#fCat'].forEach(id => $(id).addEventListener('change', renderDashboard));
+  ['#fFrom', '#fTo', '#fCia', '#fCity', '#fType', '#fCat'].forEach(id => $(id).addEventListener('change', renderDashboard));
   $$('[data-range]').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)));
 
   $('#formNovo').addEventListener('submit', saveNovo);

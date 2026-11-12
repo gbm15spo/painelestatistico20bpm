@@ -177,7 +177,7 @@ def no_access(message='Acesso administrativo necessário.',status=401):
 @app.after_request
 def headers(resp):
     resp.headers['X-Content-Type-Options']='nosniff'
-    resp.headers['Referrer-Policy']='no-referrer'
+    resp.headers['Referrer-Policy']='strict-origin-when-cross-origin'  # o servidor de mapas (OpenStreetMap) exige a origem do site
     resp.headers['X-Frame-Options']='DENY'
     resp.headers['Content-Security-Policy']=f"default-src 'self'; script-src 'self' https://unpkg.com {SCRIPT_HASHES}; style-src 'self' https://unpkg.com {STYLE_HASHES}; img-src 'self' data: https://*.tile.openstreetmap.org https://unpkg.com; connect-src 'self' https://nominatim.openstreetmap.org; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
     resp.headers['Cache-Control']='no-store'
