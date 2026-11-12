@@ -66,7 +66,7 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .alert.error{background:#fbeaea;color:var(--err);border-color:#f0c6c3}
 .alert.info{background:#f1ecdc;color:var(--brand);border-color:#d9cfb2}
 
-.filters{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-items:end}
+.filters{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;align-items:end}
 .filters.flat{grid-template-columns:repeat(4,minmax(0,1fr))}
 #tab-relatorios .filters{grid-template-columns:repeat(5,minmax(0,1fr))}
 .checks{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
@@ -109,6 +109,25 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 #map.picking{cursor:crosshair}
 .leaflet-container{font:inherit}
 #mapInfo{margin-top:10px;color:var(--muted)}
+.leaflet-tooltip.map-num{background:transparent;border:0;box-shadow:none;padding:0;color:#fff;font-weight:800;font-size:12px;text-shadow:0 0 2px rgba(0,0,0,.6)}
+.leaflet-tooltip.map-num::before{display:none}
+.donut{background:none;border:0}
+.donut svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))}
+.donut b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#14130f}
+.map-legend{margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}
+.map-legend .lg-items{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.85rem}
+.map-legend span{display:inline-flex;align-items:center;gap:6px}
+.map-legend span.off{opacity:.4}
+.map-legend p{margin:6px 0 0;font-size:.78rem;color:var(--muted)}
+.map-legend i,.mp i{display:inline-block;width:12px;height:12px;border-radius:50%;flex:none;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.map-toggle{flex-direction:row;align-items:center;gap:6px;background:rgba(255,253,248,.95);color:#1b1913;border:1px solid #ddd5c2;border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer}
+.map-toggle input{width:14px;height:14px}
+.mp b{display:block;font-size:13px}.mp>span{display:block;color:#6a6352;font-size:12px;margin-bottom:6px}
+.mp table{font-size:12px;margin-bottom:6px}.mp td{padding:3px 4px;border-bottom:1px solid #eee}.mp td:last-child{text-align:right;font-weight:700}
+.mp td i{margin-right:6px;vertical-align:-1px}
+
+.mp em{display:block;font-style:normal;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#5f5126;margin:4px 0 2px}
+
 #mapInfo p{margin:4px 0}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .chips .btn.on{background:var(--brand);border-color:var(--brand);color:#fff}
@@ -193,6 +212,7 @@ dialog h2{margin-bottom:14px}
 
 .foot{text-align:center;padding:0 16px 24px}
 
+@media (max-width:1100px){#tab-painel .filters{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media (max-width:860px){
   .filters,.filters.flat,#tab-relatorios .filters{grid-template-columns:1fr 1fr}
   .charts,.grid2{grid-template-columns:1fr}
@@ -260,6 +280,7 @@ dialog h2{margin-bottom:14px}
       <label>CIA<select id="fCia"><option value="">Todas</option></select></label>
       <label>Cidade<select id="fCity"><option value="">Todas</option></select></label>
       <label>Tipo de ocorrência<select id="fType"><option value="">Todos</option></select></label>
+      <label>Indicador<select id="fInd"><option value="">Todos</option><option value="conducoes">Conduções</option><option value="flagrantes">Flagrantes</option><option value="tco">TCO</option><option value="mandados">Mandados</option><option value="veiculos">Veículos recuperados</option><option value="armas">Armas apreendidas</option><option value="drogas">Ocorrências com drogas</option><option value="homicidios">Homicídios</option><option value="tentativas">Tentativas de homicídio</option><option value="outras">Outras ocorrências</option></select></label>
       <label>Classificação<select id="fCat">
         <option value="">Todas</option>
         <option value="homicidio">Homicídio</option>
@@ -282,7 +303,7 @@ dialog h2{margin-bottom:14px}
       <div class="card"><h2>Por CIA</h2><div id="chCia" class="hbars"></div></div>
       <div class="card"><h2>Por cidade</h2><div id="chCity" class="hbars"></div></div>
       <div class="card"><h2>Naturezas mais frequentes</h2><div id="chKind" class="hbars"></div></div>
-      <div class="card span2"><h2>Mapa de calor por bairro</h2><p class="muted small">Quanto mais quente a mancha, mais ocorrências no bairro no período. Passe o mouse (ou toque) no círculo para ver o número.</p><div id="map"></div><div id="mapInfo" class="small"></div></div>
+      <div class="card span2"><h2>Mapa de ocorrências por bairro</h2><p class="muted small">Cada cor é um indicador e o número é a quantidade no bairro; em cinza, as demais ocorrências. Clique (ou toque) num círculo para ver os tipos de ocorrência dali.</p><div id="map"></div><div id="mapLegend" class="map-legend"></div><div id="mapInfo" class="small"></div></div>
       <div class="card"><h2>Drogas apreendidas</h2><div id="tbDrugs"></div></div>
       <div class="card"><h2>Armas apreendidas</h2><div id="tbGuns"></div></div>
     </div>
@@ -556,9 +577,9 @@ function renderLists() {
   set('#dlBairro', uniq(S.records.map(r => r.neighborhood)));
 }
 function filtered() {
-  const f = { from: $('#fFrom').value, to: $('#fTo').value, cia: $('#fCia').value, city: $('#fCity').value, cat: $('#fCat').value, type: $('#fType').value };
+  const f = { from: $('#fFrom').value, to: $('#fTo').value, cia: $('#fCia').value, city: $('#fCity').value, cat: $('#fCat').value, type: $('#fType').value, ind: $('#fInd').value };
   return S.records.filter(r => (!f.from || r.date >= f.from) && (!f.to || r.date <= f.to)
-    && (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.cat || r.crime_category === f.cat) && (!f.type || kindKey(r.kind) === f.type));
+    && (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.cat || r.crime_category === f.cat) && (!f.type || kindKey(r.kind) === f.type) && (!f.ind || indOk(r, f.ind)));
 }
 function hbars(box, entries, max = 10) {
   entries = entries.filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, max);
@@ -631,6 +652,36 @@ async function loadGeo() {
 async function saveGeo(places) { return api('/api/geo', { method: 'POST', body: { places } }); }
 const toPlace = (k, lat, lon) => { const i = k.indexOf('|'); return { city: k.slice(0, i), neighborhood: k.slice(i + 1), lat, lon }; };
 
+/* Categorias do mapa = indicadores do topo do painel; ocorrências sem nenhum deles = "Outras ocorrências" */
+const MAP_CATS = [
+  ['conducoes', 'Conduções', '#1f6fb2', r => +r.conducoes || 0],
+  ['flagrantes', 'Flagrantes', '#8e44ad', r => +r.flagrantes || 0],
+  ['tco', 'TCO', '#e0a800', r => +r.tco || 0],
+  ['mandados', 'Mandados', '#16a2b8', r => +r.mandados || 0],
+  ['veiculos', 'Veículos recuperados', '#2e8b57', r => +r.veiculos || 0],
+  ['armas', 'Armas apreendidas', '#14130f', r => (r.guns || []).reduce((x, g) => x + (+g.qty || 0), 0)],
+  ['drogas', 'Ocorrências com drogas', '#c2185b', r => (r.drugs || []).length ? 1 : 0],
+  ['homicidios', 'Homicídios', '#b71c1c', r => r.crime_category === 'homicidio' ? 1 : 0],
+  ['tentativas', 'Tentativas de homicídio', '#ef6c00', r => r.crime_category === 'tentativa_homicidio' ? 1 : 0],
+];
+const OTHER_CAT = ['outras', 'Outras ocorrências', '#8f8f8f'];
+const isOther = r => MAP_CATS.every(c => !c[3](r));
+const indOk = (r, id) => id === 'outras' ? isOther(r) : !!MAP_CATS.find(c => c[0] === id)[3](r);
+let mapRs = [], heatOn = false;
+const EXPAND_ZOOM = 15; // a partir deste zoom, cada bairro se abre em pontos numerados por indicador
+function donutIcon(parts, total) {
+  const R = total > 99 ? 24 : 20, r = R - 7, sum = parts.reduce((a, p) => a + p[1], 0) || 1;
+  let ang = -Math.PI / 2, paths = '';
+  if (parts.length === 1) paths = `<circle cx="${R}" cy="${R}" r="${R - 1}" fill="${parts[0][0]}"/>`;
+  else parts.forEach(([c, v]) => {
+    const a2 = ang + 2 * Math.PI * v / sum, big = a2 - ang > Math.PI ? 1 : 0;
+    const p = (a, rr) => `${(R + rr * Math.cos(a)).toFixed(2)},${(R + rr * Math.sin(a)).toFixed(2)}`;
+    paths += `<path d="M${p(ang, R - 1)}A${R - 1},${R - 1} 0 ${big} 1 ${p(a2, R - 1)}L${p(a2, r)}A${r},${r} 0 ${big} 0 ${p(ang, r)}Z" fill="${c}"/>`;
+    ang = a2;
+  });
+  const html = `<svg width="${2 * R}" height="${2 * R}" viewBox="0 0 ${2 * R} ${2 * R}"><circle cx="${R}" cy="${R}" r="${R}" fill="#fff"/>${paths}<circle cx="${R}" cy="${R}" r="${r}" fill="#fff"/></svg><b>${total}</b>`;
+  return L.divIcon({ html, className: 'donut', iconSize: [2 * R, 2 * R], iconAnchor: [R, R], popupAnchor: [0, -R] });
+}
 function renderMap(rs) {
   const box = $('#map'), info = $('#mapInfo');
   if (!window.L || !L.heatLayer) { box.classList.add('hidden'); info.textContent = 'Mapa indisponível: a biblioteca de mapas não carregou (verifique a conexão).'; return; }
@@ -641,39 +692,91 @@ function renderMap(rs) {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap', referrerPolicy: 'strict-origin-when-cross-origin' }).addTo(map);
     marks = L.layerGroup().addTo(map);
     map.on('click', onMapClick);
+    map.on('zoomend', () => drawPoints());
+    const hc = L.control({ position: 'topright' });
+    hc.onAdd = () => { const d = L.DomUtil.create('label', 'map-toggle'); d.innerHTML = '<input type="checkbox"> Mancha de calor'; L.DomEvent.disableClickPropagation(d);
+      d.querySelector('input').addEventListener('change', e => { heatOn = e.target.checked; drawPoints(); }); return d; };
+    hc.addTo(map);
   }
-  const m = new Map(); let semBairro = 0;
-  rs.forEach(r => { if (!r.neighborhood) { semBairro++; return; } const k = (r.city || '') + '|' + r.neighborhood; m.set(k, (m.get(k) || 0) + 1); });
-  const top = Math.max(1, ...m.values()), pts = [], miss = [];
+  mapRs = rs;
+  const pts = drawPoints();
+  const sig = pts.map(p => p.join(',')).sort().join(';');
+  if (pts.length && sig !== lastFit && !picking) { lastFit = sig; map.fitBounds(L.latLngBounds(pts).pad(.3), { maxZoom: 14 }); drawPoints(); }
+}
+/* Desenha, em cada bairro, um ponto por indicador (cor própria) com o total dentro. Retorna as posições usadas. */
+function drawPoints() {
+  if (!map) return [];
+  const rs = mapRs, info = $('#mapInfo'), box = $('#map');
+  const byNb = new Map(); let semBairro = 0;
+  rs.forEach(r => {
+    if (!r.neighborhood) { semBairro++; return; }
+    const k = (r.city || '') + '|' + r.neighborhood;
+    if (!byNb.has(k)) byNb.set(k, []);
+    byNb.get(k).push(r);
+  });
   marks.clearLayers();
-  [...m].sort((a, b) => b[1] - a[1]).forEach(([k, v]) => {
+  const pts = [], miss = [], heatPts = [], used = new Set();
+  const topNb = Math.max(1, ...[...byNb.values()].map(a => a.length));
+  const z = map.getZoom();
+  const tk = r => kindLabel(kindKey(r.kind)) || 'Tipo não informado';
+  [...byNb].sort((a, b) => b[1].length - a[1].length).forEach(([k, list]) => {
     const g = S.geo[k];
     if (!g) { miss.push(k); return; }
-    pts.push([g[0], g[1], v / top]);
-    const c = L.circleMarker(g, { radius: 6 + 10 * v / top, color: '#14130f', weight: 1, fillColor: '#a3261c', fillOpacity: .3, bubblingMouseEvents: false })
-      .bindTooltip(`<b>${esc(placeLabel(k))}</b><br>${fmtN(v)} ocorrência(s)`).addTo(marks);
-    if (S.admin) c.on('click', () => startPick(k));
+    pts.push(g); heatPts.push([g[0], g[1], list.length / topNb]);
+    const cats = MAP_CATS.map(([id, l, c, f]) => [id, l, c, list.reduce((x, r) => x + f(r), 0)]);
+    cats.push([...OTHER_CAT, list.filter(isOther).length]);
+    const sel = $('#fInd').value, show = cats.filter(c => c[3] > 0 && (!sel || c[0] === sel));
+    const types = countBy(list, tk).sort((a, b) => b[1] - a[1]);
+    const n = show.length, center = map.project(g, z);
+    const popup = `<div class="mp"><b>${esc(placeLabel(k))}</b><span>${pl(list.length, 'ocorrência', 'ocorrências')}</span>
+      <table>${show.map(([, l, c, v]) => `<tr><td><i data-c="${c}"></i>${esc(l)}</td><td>${fmtN(v)}</td></tr>`).join('')}</table>
+      <em>Tipos de ocorrência</em>
+      <table>${types.map(([t, v]) => `<tr><td>${esc(t)}</td><td>${fmtN(v)}</td></tr>`).join('')}</table>
+      ${S.admin ? `<button type="button" class="btn sm" data-pick="${esc(k)}">Corrigir posição do bairro</button>` : ''}</div>`;
+    show.forEach(([id]) => used.add(id));
+    if (!show.length) return;
+    if (z < EXPAND_ZOOM && show.length > 1) {
+      const total = sel ? show[0][3] : list.length;
+      const mk = L.marker(g, { icon: donutIcon(show.map(c => [c[2], c[3]]), total), title: placeLabel(k), riseOnHover: true })
+        .bindPopup(popup, { maxWidth: 300 }).addTo(marks);
+      mk.on('popupopen', e => { $$('[data-c]', e.popup.getElement()).forEach(el => { el.style.background = el.dataset.c; }); });
+      return;
+    }
+    show.forEach(([id, l, c, v], i) => {
+      let ll = g; // vários indicadores no mesmo bairro: pontos em volta da posição do bairro
+      if (n > 1) { const ang = (2 * Math.PI * i) / n - Math.PI / 2, rad = 14 + 3 * n; ll = map.unproject(center.add([Math.cos(ang) * rad, Math.sin(ang) * rad]), z); }
+      const m = L.circleMarker(ll, { radius: 11 + Math.min(6, v), color: '#fff', weight: 2, fillColor: c, fillOpacity: .95, bubblingMouseEvents: false })
+        .bindTooltip(String(v), { permanent: true, direction: 'center', className: 'map-num', interactive: false })
+        .bindPopup(popup, { maxWidth: 300 })
+        .addTo(marks);
+      m.on('popupopen', e => { $$('[data-c]', e.popup.getElement()).forEach(el => { el.style.background = el.dataset.c; }); });
+    });
   });
-  if (heat) map.removeLayer(heat);
-  heat = L.heatLayer(pts, { radius: 40, blur: 30, maxZoom: 10, minOpacity: .35 });
-  const draw = heat._redraw; // não redesenha com o mapa oculto (largura 0)
-  heat._redraw = function () { const z = map.getSize(); if (z.x && z.y) draw.call(this); else this._frame = null; };
-  heat.addTo(map);
-  const sig = pts.map(p => p[0] + ',' + p[1]).sort().join(';');
-  if (pts.length && sig !== lastFit && !picking) { lastFit = sig; map.fitBounds(L.latLngBounds(pts.map(p => [p[0], p[1]])).pad(.3), { maxZoom: 14 }); }
+  if (heat) { map.removeLayer(heat); heat = null; }
+  if (heatOn && heatPts.length) {
+    heat = L.heatLayer(heatPts, { radius: 40, blur: 30, maxZoom: 10, minOpacity: .3 });
+    const draw = heat._redraw; // não redesenha com o mapa oculto (largura 0)
+    heat._redraw = function () { const zz = map.getSize(); if (zz.x && zz.y) draw.call(this); else this._frame = null; };
+    heat.addTo(map); heat.bringToBack && heat.bringToBack();
+  }
+  // legenda abaixo do mapa (sempre os 9 indicadores + outras ocorrências)
+  const lg = $('#mapLegend');
+  lg.innerHTML = '<div class="lg-items">' + [...MAP_CATS, OTHER_CAT].map(([id, l, c]) => `<span class="${used.has(id) ? '' : 'off'}"><i data-c="${c}"></i>${esc(l)}</span>`).join('') + '</div>' +
+    '<p>Círculo com fatias = total de ocorrências do bairro (aproxime o zoom para ver cada indicador separado). Ponto colorido = quantidade daquele indicador. Clique no círculo ou no ponto para ver os tipos de ocorrência.</p>';
+  $$('[data-c]', lg).forEach(el => { el.style.background = el.dataset.c; });
 
   let h = '';
   if (picking) h += `<p><strong>Clique no mapa no ponto onde fica ${esc(placeLabel(picking))}.</strong> <button type="button" class="btn sm ghost" data-pick="">Cancelar</button></p>`;
   if (miss.length) {
-    if (S.admin) h += `<p>${miss.length} bairro(s) ainda sem posição no mapa${geoBusy ? ' — localizando automaticamente…' : ''}. Para posicionar à mão, clique no bairro e depois no ponto do mapa:</p><div class="chips">${miss.map(k => `<button type="button" class="btn sm${picking === k ? ' on' : ''}" data-pick="${esc(k)}">${esc(placeLabel(k))} · ${m.get(k)}</button>`).join('')}</div>`;
+    if (S.admin) h += `<p>${miss.length} bairro(s) ainda sem posição no mapa${geoBusy ? ' — localizando automaticamente…' : ''}. Para posicionar à mão, clique no bairro e depois no ponto do mapa:</p><div class="chips">${miss.map(k => `<button type="button" class="btn sm${picking === k ? ' on' : ''}" data-pick="${esc(k)}">${esc(placeLabel(k))} · ${byNb.get(k).length}</button>`).join('')}</div>`;
     else h += `<p>${miss.length} bairro(s) ainda sem posição no mapa: ${esc(miss.map(placeLabel).join(', '))}.</p>`;
   }
-  if (S.admin && pts.length) h += '<p>Para corrigir a posição de um bairro, clique no círculo dele e depois no ponto certo do mapa.</p>';
   if (semBairro) h += `<p>${fmtN(semBairro)} ocorrência(s) sem bairro informado não aparecem no mapa.</p>`;
   if (!rs.length) h = '';
   info.innerHTML = h;
   box.classList.toggle('picking', !!picking);
   if (S.admin) geocodeMissing(miss);
+  return pts;
 }
 function startPick(k) { picking = k || null; renderDashboard(); if (picking) $('#map').scrollIntoView({ block: 'center', behavior: 'smooth' }); }
 async function onMapClick(e) {
@@ -1170,7 +1273,7 @@ function bind() {
   $('#btnLogout').addEventListener('click', doLogout);
   $('#formLogin').addEventListener('submit', doLogin);
   $$('#tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
-  ['#fFrom', '#fTo', '#fCia', '#fCity', '#fType', '#fCat'].forEach(id => $(id).addEventListener('change', renderDashboard));
+  ['#fFrom', '#fTo', '#fCia', '#fCity', '#fType', '#fCat', '#fInd'].forEach(id => $(id).addEventListener('change', renderDashboard));
   $$('[data-range]').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)));
 
   $('#formNovo').addEventListener('submit', saveNovo);
@@ -1213,7 +1316,7 @@ function bind() {
     const del = e.target.closest('[data-del]');
     if (del) { const ed = del.closest('.editor'); del.closest('.srow').remove(); if (ed && ed.id === 'formNovo') scheduleDraft(); }
     const pk = e.target.closest('[data-pick]');
-    if (pk && S.admin) startPick(pk.dataset.pick);
+    if (pk && S.admin) { if (map) map.closePopup(); startPick(pk.dataset.pick); }
     const cl = e.target.closest('[data-close]');
     if (cl) cl.closest('dialog').close();
   });
