@@ -1,0 +1,48 @@
+PMBA - 20 BPM | VERSÃO PARA VERCEL + POSTGRESQL
+
+Este pacote é o aplicativo completo. NÃO é apenas um HTML.
+O servidor Flask é executado como função Python da Vercel, e os dados ficam no PostgreSQL.
+Não há dados de ocorrências incluídos nem senha cadastrada no código.
+
+COMO PUBLICAR
+1. Descompacte a pasta e envie o CONTEÚDO da pasta PMBA_20BPM_VERCEL a um novo repositório PRIVADO no GitHub.
+2. Vercel > Add New > Project > Importar repositório do GitHub; framework Flask detectado automaticamente.
+3. Vercel > Storage / Marketplace > adicionar Neon (ou outro PostgreSQL compatível) e conectar ao projeto.
+   Verifique se a integração disponibiliza DATABASE_URL ou POSTGRES_URL em Production.
+   Prefira a URL com pooler SSL do provedor, se existir.
+4. No seu computador, execute: python gerar_hash_senha.py
+   Digite uma SENHA FORTE NOVA com pelo menos 12 caracteres (não reutilize a senha antiga).
+5. Vercel > Project > Settings > Environment Variables > Production:
+     ADMIN_USERNAME      = seu usuário de administrador
+     ADMIN_PASSWORD_HASH = código de hash gerado no passo 4
+   NÃO coloque senha legível em código, HTML ou GitHub.
+6. Faça Redeploy (Deployments > Redeploy) depois de conectar banco e configurar env vars.
+7. Acesse seu endereco https://...vercel.app : visitantes consultam estatísticas.
+   Você clica em Acesso administrativo e usa usuário e nova senha.
+
+OBSERVAÇÕES
+- São necessários três segredos/configurações: DATABASE_URL (ou POSTGRES_URL),
+  ADMIN_USERNAME e ADMIN_PASSWORD_HASH. Sem banco configurado, o sistema avisa erro 503.
+- O Postgres é persistente; NÃO use SQLite local na Vercel, pois os dados se perdem.
+- Público: apenas consultas e gráficos (sem número/endereço completo/observações).
+- Admin: cadastro, importação PDF com revisão, edição e exclusão individual,
+  Excel (.xlsx), backups JSON, relatórios e gráficos.
+- O sistema não tem apagamento de todos os registros, somente exclusão individual.
+- Confira os dados de PDF antes de confirmar a importação. PDFs digitalizados não são
+  reconhecidos nesta versão (falta OCR).
+- O mapa de calor é um quadro de intensidade POR BAIRRO, não um mapa geográfico.
+- Guarde backups JSON; o PostgreSQL é um serviço separado e pode ter custos ou limites.
+- Não publique relatórios sigilosos nem dados pessoais no dashboard público.
+  A implantação deve respeitar as normas de acesso, proteção de dados e uso da PMBA.
+- O banco cria tabelas vazias automaticamente no primeiro acesso ao painel.
+- A antiga senha simples não foi incluída em nenhum arquivo deste pacote.
+
+TESTE LOCAL (opcional)
+Requer Python 3.12+; instale dependências em requirements.txt.
+Defina DATABASE_URL para um banco PostgreSQL de teste e defina as env vars de admin.
+Rode: python app.py
+Acesse http://127.0.0.1:8080
+
+SUPORTE VERCEL
+https://vercel.com/docs/postgres
+https://vercel.com/kb/guide/ship-a-flask-app-on-vercel
