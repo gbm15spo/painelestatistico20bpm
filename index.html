@@ -70,6 +70,25 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .filters.flat{grid-template-columns:repeat(4,minmax(0,1fr))}
 #tab-relatorios .filters{grid-template-columns:repeat(5,minmax(0,1fr))}
 .checks{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+#rInds,#pInds{display:flex;flex-wrap:wrap;gap:6px 14px;flex:1 1 300px}
+#rInds label,#pInds label{flex-direction:row;align-items:center;gap:6px;color:var(--text);font-size:.88rem}
+#rInds input,#pInds input{width:16px;height:16px}
+.checks i,.podium-box h4 i{display:inline-block;width:11px;height:11px;border-radius:50%;flex:none}
+.vc{display:block;font-size:.66rem;font-weight:700;white-space:nowrap}
+.podiums{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}
+.podium-box{border:1px solid var(--line);border-radius:8px;padding:10px 12px;break-inside:avoid}
+.podium-box h4{margin:0 0 4px;font-size:.85rem;display:flex;align-items:center;gap:6px}
+.podium{display:flex;align-items:stretch;gap:6px;height:200px}
+.pc{flex:1 1 0;min-width:0;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.pc .bw{flex:1 1 auto;min-height:0;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.pc .pos{font-size:.72rem;font-weight:800;color:var(--muted)}
+.pc .v{font-size:.85rem;font-weight:800;margin-bottom:2px}
+.pc .bar{display:block;width:72%;max-width:56px;background:#8f7d47;border-radius:4px 4px 0 0}
+.pc .bar.g1,.legend i.g1{background:#c9a227}.pc .bar.g2,.legend i.g2{background:#a9b0b8}.pc .bar.g3,.legend i.g3{background:#b0703c}
+.pc .l{font-size:.72rem;font-weight:700;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pc .ant{font-size:.64rem;color:var(--muted);white-space:nowrap}
+@media (max-width:620px){.podiums{grid-template-columns:1fr}}
+@media print{.podiums{grid-template-columns:1fr 1fr}}
 #pCias{display:flex;flex-wrap:wrap;gap:6px 14px;flex:1 1 260px}
 #pCias label{flex-direction:row;align-items:center;gap:6px;color:var(--text);font-size:.92rem}
 #pCias input{width:17px;height:17px}
@@ -148,6 +167,9 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .grid .wide{grid-column:span 2}
 .grid.ind{grid-template-columns:repeat(5,minmax(0,1fr))}
+.geo-row{display:flex;gap:6px;align-items:center}
+.geo-row .btn{white-space:nowrap}
+.geo-msg{font-weight:600;min-height:1em}.geo-msg.good{color:var(--ok)}.geo-msg.bad{color:var(--err)}
 .seiz{border:1px dashed var(--line);border-radius:10px;padding:10px;margin-bottom:12px}
 .seiz-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
 .seiz .list{display:flex;flex-direction:column;gap:6px}
@@ -366,6 +388,7 @@ dialog h2{margin-bottom:14px}
       <label data-r="custom">De<input type="date" id="rFrom"></label>
       <label data-r="custom">Até<input type="date" id="rTo"></label>
       <label>Tipo de ocorrência<select id="rType"><option value="">Todos</option></select></label>
+      <label>Indicador<select id="rInd"></select></label>
       <label>CIA<select id="rCia"><option value="">Todas</option></select></label>
       <label>Cidade<select id="rCity"><option value="">Todas</option></select></label>
       <label>Bairro<select id="rNb"><option value="">Todos</option></select></label>
@@ -383,6 +406,7 @@ dialog h2{margin-bottom:14px}
         <button type="button" class="btn sm ghost" id="rToday" data-r="ref">Hoje</button>
         <button type="button" class="btn primary" id="rPrint">Imprimir / Salvar em PDF</button>
       </div>
+      <div class="checks inds"><strong>Indicadores no relatório</strong><div id="rInds"></div></div>
     </div>
     <article id="report" class="report"></article>
   </section>
@@ -394,6 +418,13 @@ dialog h2{margin-bottom:14px}
         <label>De<input type="date" id="pFrom"></label>
         <label>Até<input type="date" id="pTo"></label>
         <label>Tipo de ocorrência<select id="pType"><option value="">Todos</option></select></label>
+        <label>Indicador<select id="pInd"></select></label>
+        <label>Comparação<select id="pCmp">
+          <option value="none">Sem comparação</option><option value="prev">Período anterior</option>
+          <option value="year">Mesmo período do ano anterior</option><option value="custom">Outro período (escolher datas)</option>
+        </select></label>
+        <label data-p="cmp">Comparar de<input type="date" id="pCFrom"></label>
+        <label data-p="cmp">Comparar até<input type="date" id="pCTo"></label>
         <label>Mostrar<select id="pShow">
           <option value="both">Total e por tipo de ocorrência</option><option value="total">Só o total por CIA</option><option value="type">Só por tipo de ocorrência</option>
         </select></label>
@@ -404,6 +435,7 @@ dialog h2{margin-bottom:14px}
           <button type="button" class="btn sm ghost" data-prange="all">Tudo</button>
         </div>
       </div>
+      <div class="checks inds"><strong>Indicadores no relatório</strong><div id="pInds"></div></div>
       <div class="checks"><strong>CIAs no relatório</strong><div id="pCias"></div>
         <button type="button" class="btn sm ghost" id="pAll">Marcar / desmarcar todas</button>
         <button type="button" class="btn primary" id="pPrint">Imprimir / Salvar em PDF</button></div>
@@ -491,7 +523,7 @@ async function api(path, { method = 'GET', body, raw, type } = {}) {
   if (S.csrf) headers['X-CSRF-Token'] = S.csrf;
   let b;
   if (raw) { b = raw; headers['Content-Type'] = type; }
-  else if (body !== undefined) { b = JSON.stringify(body); headers['Content-Type'] = 'application/json'; }
+  else if (body !== undefined) { b = JSON.stringify(body, (k, v) => k === '_geoBad' ? undefined : v); headers['Content-Type'] = 'application/json'; }
   const r = await fetch(path, { method, headers, body: b, credentials: 'same-origin' });
   let j = null; try { j = await r.json(); } catch (_) {}
   if (!r.ok) { const e = new Error((j && j.error) || ('Erro ' + r.status)); e.status = r.status; throw e; }
@@ -789,6 +821,11 @@ async function onMapClick(e) {
   renderDashboard();
 }
 async function geocodeMissing(keys) {
+  // 1º: bairros sem posição recebem a média das coordenadas das próprias ocorrências
+  const fromRecs = [];
+  keys.forEach(k => { const list = S.records.filter(r => r.lat != null && (r.city || '') + '|' + r.neighborhood === k);
+    if (list.length) { const la = +(list.reduce((a, r) => a + r.lat, 0) / list.length).toFixed(6), lo = +(list.reduce((a, r) => a + r.lon, 0) / list.length).toFixed(6); S.geo[k] = [la, lo]; fromRecs.push(toPlace(k, la, lo)); } });
+  if (fromRecs.length) { try { await saveGeo(fromRecs); } catch (_) {} setTimeout(renderDashboard, 0); return; }
   keys = keys.filter(k => !geoMiss.has(k) && !S.geo[k]);
   if (geoBusy || !keys.length) return;
   geoBusy = true;
@@ -842,6 +879,7 @@ function editorHTML(r = {}) {
     <label>Cidade *<input name="city" list="dlCity" maxlength="100" required value="${v('city')}"></label>
     <label>Bairro<input name="neighborhood" list="dlBairro" maxlength="100" value="${v('neighborhood')}"></label>
     <label class="wide">Endereço / local<input name="location" maxlength="350" value="${v('location')}"></label>
+    <label class="wide geo-f">Coordenada ou link do Google Maps<span class="geo-row"><input name="geo" maxlength="500" placeholder="Ex.: -9.4062, -38.2147 ou https://maps.app.goo.gl/…" value="${r.lat != null && r.lon != null ? r.lat + ', ' + r.lon : ''}"><a class="btn sm ghost geo-open${r.lat != null ? '' : ' hidden'}" target="_blank" rel="noopener" href="${r.lat != null ? 'https://www.google.com/maps?q=' + r.lat + ',' + r.lon : '#'}">Ver no mapa</a></span><small class="geo-msg"></small></label>
     <label>Classificação<select name="crime_category">${Object.entries(CATS).map(([k, l]) => `<option value="${k}"${(r.crime_category || 'outros') === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
     <label class="wide">Tipo / natureza<input name="kind" maxlength="120" placeholder="Ex.: Tráfico de drogas" value="${v('kind')}"></label>
   </div>
@@ -860,6 +898,8 @@ function readEditor(root) {
   const rec = {};
   ['date','time','ref','cia','city','neighborhood','location','kind','crime_category','notes','source'].forEach(k => rec[k] = g(k));
   IND.forEach(([k]) => { const n = parseInt(g(k), 10); rec[k] = Number.isFinite(n) && n > 0 ? n : 0; });
+  const gv = g('geo'), c = parseCoords(gv);
+  rec.lat = c ? c[0] : null; rec.lon = c ? c[1] : null; rec._geoBad = !!gv && !c;
   rec.drugs = $$('.drugs .srow', root).map(row => ({ type: $('[data-f=type]', row).value.trim(), qty: parseFloat($('[data-f=qty]', row).value), unit: $('[data-f=unit]', row).value }))
     .filter(d => d.type);
   rec.guns = $$('.guns .srow', root).map(row => ({ type: $('[data-f=type]', row).value.trim(), qty: parseInt($('[data-f=qty]', row).value, 10) }))
@@ -867,6 +907,7 @@ function readEditor(root) {
   return rec;
 }
 function checkRecord(r) {
+  if (r._geoBad) return 'Coordenada ou link do Google Maps não reconhecido. Use, por exemplo: -9.4062, -38.2147.';
   if (!r.date) return 'Informe a data.';
   if (!r.cia) return 'Informe a CIA.';
   if (!r.city) return 'Informe a cidade.';
@@ -875,6 +916,36 @@ function checkRecord(r) {
   return '';
 }
 function mountEditor(form, rec) { $('.ed-body', form).innerHTML = editorHTML(rec); }
+
+/* ---------- Coordenada da ocorrência ---------- */
+// Aceita "-9.4062, -38.2147", graus/min/seg (9°24'22"S 38°12'53"W) e links do Google Maps (@lat,lng, ?q=, !3d…!4d…)
+function parseCoords(t) {
+  t = String(t || '').trim(); if (!t) return null;
+  try { t = decodeURIComponent(t); } catch (_) {}
+  const ok = (a, b) => isFinite(a) && isFinite(b) && Math.abs(a) <= 90 && Math.abs(b) <= 180 && !(a === 0 && b === 0) ? [+a.toFixed(6), +b.toFixed(6)] : null;
+  let m = t.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/); if (m) return ok(+m[1], +m[2]);
+  m = t.match(/[?&](?:q|query|ll|center|destination|daddr)=(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/); if (m) return ok(+m[1], +m[2]);
+  m = t.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/); if (m) return ok(+m[1], +m[2]);
+  m = t.match(/(\d+(?:\.\d+)?)\s*°\s*(?:(\d+(?:\.\d+)?)\s*['′]\s*)?(?:(\d+(?:\.\d+)?)\s*["″]\s*)?([NS])[\s,;]+(\d+(?:\.\d+)?)\s*°\s*(?:(\d+(?:\.\d+)?)\s*['′]\s*)?(?:(\d+(?:\.\d+)?)\s*["″]\s*)?([EWLO])/i);
+  if (m) { const d = (g, mi, se) => +g + (+mi || 0) / 60 + (+se || 0) / 3600; return ok(d(m[1], m[2], m[3]) * (/s/i.test(m[4]) ? -1 : 1), d(m[5], m[6], m[7]) * (/[wo]/i.test(m[8]) ? -1 : 1)); }
+  if (/^https?:/i.test(t)) return null;
+  m = t.match(/^\s*(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)\s*$/); if (m) return ok(+m[1].replace(',', '.'), +m[2].replace(',', '.'));
+  return null;
+}
+async function geoFieldChanged(inp) {
+  const lab = inp.closest('.geo-f'), msg = $('.geo-msg', lab), open = $('.geo-open', lab);
+  let v = inp.value.trim(); msg.className = 'geo-msg'; msg.textContent = '';
+  if (v && !parseCoords(v) && /^https:\/\/(maps\.app\.goo\.gl|goo\.gl)\//i.test(v)) {
+    msg.textContent = 'Lendo o link…';
+    try { const j = await api('/api/geo/resolve', { method: 'POST', body: { url: v } }); const c = parseCoords(j.url); if (c) { inp.value = c[0] + ', ' + c[1]; v = inp.value; } }
+    catch (e) { msg.textContent = e.message; msg.classList.add('bad'); open.classList.add('hidden'); return; }
+  }
+  const c = parseCoords(v);
+  if (!v) { open.classList.add('hidden'); return; }
+  if (!c) { msg.textContent = 'Não reconhecido. Cole a coordenada (ex.: -9.4062, -38.2147) ou o link do Google Maps.'; msg.classList.add('bad'); open.classList.add('hidden'); return; }
+  inp.value = c[0] + ', ' + c[1]; msg.textContent = '✓ Coordenada reconhecida'; msg.classList.add('good');
+  open.href = 'https://www.google.com/maps?q=' + c[0] + ',' + c[1]; open.classList.remove('hidden');
+}
 
 /* ---------- Cadastro + rascunho ---------- */
 let draftTimer;
@@ -961,7 +1032,7 @@ function renderTable() {
     const ap = [...(r.drugs || []).map(d => `${d.type}: ${d.qty} ${d.unit || 'g'}`), ...(r.guns || []).map(g => `${g.type}: ${g.qty}`)].join('; ');
     return `<tr data-id="${esc(r.id)}"><td>${fmtD(r.date)}</td><td>${esc(r.time)}</td><td>${esc(r.ref)}</td><td>${esc(r.kind)}</td><td>${tag}</td><td>${esc(r.cia)}</td><td>${esc(r.city)}</td><td>${esc(r.neighborhood)}</td>
       ${IND.map(([k]) => `<td class="n">${+r[k] || ''}</td>`).join('')}<td class="small">${esc(ap)}</td>
-      <td class="acts"><button type="button" class="btn sm" data-edit>Editar</button> <button type="button" class="btn sm ghost danger" data-remove>Excluir</button></td></tr>`;
+      <td class="acts">${r.lat != null ? `<a class="btn sm ghost" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${r.lat},${r.lon}" title="Abrir a coordenada no Google Maps">Mapa</a> ` : ''}<button type="button" class="btn sm" data-edit>Editar</button> <button type="button" class="btn sm ghost danger" data-remove>Excluir</button></td></tr>`;
   }).join('') || '<tr><td colspan="15" class="muted">Nenhuma ocorrência encontrada.</td></tr>';
   $('#tblInfo').textContent = `${fmtN(rs.length)} registro(s)` + (rs.length > shown.length ? ` · exibindo os ${shown.length} mais recentes; refine a busca.` : '');
 }
@@ -1073,7 +1144,7 @@ function cmpRange(kind, a, b) {
   const n = dayDiff(a, b) + 1; return [addDays(a, -n), addDays(a, -1)];
 }
 function reportText(f, a, b, cur, rs, cmp, prev) {
-  const scope = [f.type ? `de “${kindLabel(f.type)}”` : '', f.cia ? `da ${f.cia}` : '', f.nb ? `no bairro ${f.nb}` : '', f.city ? `em ${f.city}` : ''].filter(Boolean).join(' ');
+  const scope = [f.ind ? `com ${lowName(indName(f.ind))}` : '', f.type ? `de “${kindLabel(f.type)}”` : '', f.cia ? `da ${f.cia}` : '', f.nb ? `no bairro ${f.nb}` : '', f.city ? `em ${f.city}` : ''].filter(Boolean).join(' ');
   const n = cur['Ocorrências'], per = a === b ? `Em ${fmtD(a)}` : `De ${fmtD(a)} a ${fmtD(b)}`;
   let t = n ? `${per}, ${n === 1 ? 'foi registrada' : 'foram registradas'} ${pl(n, 'ocorrência', 'ocorrências')}` : `${per}, não houve ocorrências registradas`;
   if (scope) t += ' ' + scope;
@@ -1113,12 +1184,13 @@ function renderReport() {
   $$('[data-r=cmp]').forEach(e => e.classList.toggle('hidden', cmpMode !== 'custom'));
   $$('[data-r=types]').forEach(e => e.classList.toggle('hidden', cmpMode === 'none'));
   const [kind, a, b] = repRange(), cmp = cmpRange(kind, a, b);
-  const f = { cia: $('#rCia').value, city: $('#rCity').value, nb: $('#rNb').value, type: $('#rType').value };
-  const base = S.records.filter(r => (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.nb || r.neighborhood === f.nb) && (!f.type || kindKey(r.kind) === f.type));
+  const f = { cia: $('#rCia').value, city: $('#rCity').value, nb: $('#rNb').value, type: $('#rType').value, ind: $('#rInd').value };
+  const marked = indChecks($('#rInds'), 'r');
+  const base = S.records.filter(r => (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.nb || r.neighborhood === f.nb) && (!f.type || kindKey(r.kind) === f.type) && (!f.ind || indOk(r, f.ind)));
   const within = (x, y) => base.filter(r => r.date >= x && r.date <= y);
   const rs = within(a, b).sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
   const ps = cmp ? within(cmp[0], cmp[1]) : [];
-  const cur = statsOf(rs), prev = statsOf(ps), keys = Object.keys(cur);
+  const cur = statsOf(rs), prev = statsOf(ps), keys = ['Ocorrências', ...marked.map(c => c[1])];
   // evolução
   const g = granOf(kind, a, b), labels = bucketLabels(g, a, b), cb = labels.map(() => 0), pb = labels.map(() => 0);
   rs.forEach(r => { cb[bucketIdx(g, r.date, r.time, a)]++; });
@@ -1128,11 +1200,11 @@ function renderReport() {
   const tk = r => kindLabel(kindKey(r.kind)) || 'Não informado', tc = new Map(countBy(rs, tk)), tp = new Map(countBy(ps, tk));
   const types = [...new Set([...tc.keys(), ...tp.keys()])].map(k => [k, tc.get(k) || 0, tp.get(k) || 0]).sort((x, y) => y[1] - x[1] || y[2] - x[2]).slice(0, 12);
   const [drugs, guns] = seizures(rs), viol = rs.filter(r => r.crime_category !== 'outros');
-  const filt = [f.type ? 'Tipo: ' + kindLabel(f.type) : '', f.cia || 'Todas as CIAs', f.nb ? 'Bairro: ' + f.nb : '', f.city || (f.nb ? '' : 'Todas as cidades')].filter(Boolean).join(' · ');
+  const filt = [f.ind ? 'Indicador: ' + indName(f.ind) : '', f.type ? 'Tipo: ' + kindLabel(f.type) : '', f.cia || 'Todas as CIAs', f.nb ? 'Bairro: ' + f.nb : '', f.city || (f.nb ? '' : 'Todas as cidades')].filter(Boolean).join(' · ');
   const warn = cmpMode === 'custom' && !cmp ? '<p class="nodata noprint">Informe as duas datas do período de comparação.</p>' : '';
   box.innerHTML = repHead(`Relatório Operacional ${PER[kind]}`, `<strong>Período:</strong> ${span(a, b)}${cmp ? ` · <strong>Comparação:</strong> ${span(cmp[0], cmp[1])}` : ''}`, filt) + warn + `
     <h3>Resumo</h3><p class="rep-text">${esc(reportText(f, a, b, cur, rs, cmp, prev))}</p>
-    <div class="rep-kpis">${['Ocorrências', 'Conduções', 'Flagrantes', 'Armas apreendidas'].map(k => { const [c, t] = variation(cur[k], prev[k]); return `<div><b>${fmtN(cur[k])}</b><span>${k}</span>${cmp ? `<em class="${c}">${t}</em>` : ''}</div>`; }).join('')}</div>
+    <div class="rep-kpis">${keys.slice(0, 4).map(k => { const [c, t] = variation(cur[k], prev[k]); return `<div><b>${fmtN(cur[k])}</b><span>${k}</span>${cmp ? `<em class="${c}">${t}</em>` : ''}</div>`; }).join('')}</div>
     <h3>${cmp ? 'Indicadores e variação em relação ao período de comparação' : 'Indicadores do período'}</h3>
     <table><thead><tr><th>Indicador</th><th class="n">Período</th>${cmp ? '<th class="n">Comparação</th><th class="n">Diferença</th><th class="n">Variação</th>' : ''}</tr></thead><tbody>
       ${keys.map(k => { const [c, t] = variation(cur[k], prev[k]), d = cur[k] - prev[k]; return `<tr><td>${k}</td><td class="n"><strong>${fmtN(cur[k])}</strong></td>${cmp ? `<td class="n">${fmtN(prev[k])}</td><td class="n">${d > 0 ? '+' : d < 0 ? '−' : ''}${fmtN(Math.abs(d))}</td><td class="n ${c}"><strong>${t}</strong></td>` : ''}</tr>`; }).join('')}
@@ -1164,6 +1236,20 @@ function shiftReport(dir) {
   $('#rRef').value = dir < 0 ? addDays(a, -1) : addDays(b, 1); renderReport();
 }
 
+/* ---------- Indicadores fixos nos relatórios (marcar/desmarcar) ---------- */
+const indOff = { r: new Set(), p: new Set() };
+function indChecks(box, which) {
+  const off = indOff[which];
+  box.innerHTML = MAP_CATS.map(([id, l, c]) => `<label><input type="checkbox" value="${id}"${off.has(id) ? '' : ' checked'}><i data-c="${c}"></i>${esc(l)}</label>`).join('');
+  $$('[data-c]', box).forEach(el => { el.style.background = el.dataset.c; });
+  return MAP_CATS.filter(c => !off.has(c[0]));
+}
+const lowName = l => l.replace(/^(?!TCO)./, ch => ch.toLowerCase());
+const SELNAME = { conducoes: 'Só com conduções', flagrantes: 'Só com flagrantes', tco: 'Só com TCO', mandados: 'Só com mandados', veiculos: 'Só com veículos recuperados', armas: 'Só com armas apreendidas', drogas: 'Só ocorrências com drogas', homicidios: 'Só homicídios', tentativas: 'Só tentativas de homicídio' };
+const INDSEL = `<option value="">Todas as ocorrências</option>${MAP_CATS.map(([id]) => `<option value="${id}">${SELNAME[id]}</option>`).join('')}<option value="outras">Só outras ocorrências</option>`;
+const indName = id => id === 'outras' ? 'Outras ocorrências' : (MAP_CATS.find(c => c[0] === id) || [, ''])[1];
+const varCell = (c, p) => { const [cl, t] = variation(c, p); return `<small class="vc ${cl}">${fmtN(p)} · ${t.replace(' sem registro na comparação', ' novo').replace('= sem variação', '=')}</small>`; };
+
 /* ---------- Produtividade por CIA (somente administrador) ---------- */
 const pOff = new Set(); // CIAs desmarcadas
 function renderProdCias() {
@@ -1177,52 +1263,84 @@ function setProdRange(kind) {
   else { const [a, b] = periodOf(kind, t); $('#pFrom').value = a; $('#pTo').value = b > t ? t : b; }
   renderProd();
 }
+function prodCmpRange(a, b) {
+  const mode = $('#pCmp').value;
+  if (mode === 'none' || !a || !b) return null;
+  if (mode === 'year') return [shiftYear(a, -1), shiftYear(b, -1)];
+  if (mode === 'custom') { let x = $('#pCFrom').value, y = $('#pCTo').value; if (!x || !y) return null; if (x > y) [x, y] = [y, x]; return [x, y]; }
+  const n = dayDiff(a, b) + 1; return [addDays(a, -n), addDays(a, -1)];
+}
 function renderProd() {
   const box = $('#prodReport'); if (!S.admin) { box.innerHTML = ''; return; }
   const cias = renderProdCias().filter(c => !pOff.has(c));
+  const marked = indChecks($('#pInds'), 'p');
+  $$('[data-p=cmp]').forEach(e => e.classList.toggle('hidden', $('#pCmp').value !== 'custom'));
   let a = $('#pFrom').value, b = $('#pTo').value; if (a && b && a > b) [a, b] = [b, a];
-  const type = $('#pType').value, show = $('#pShow').value;
-  const rs = S.records.filter(r => cias.includes(r.cia) && (!a || r.date >= a) && (!b || r.date <= b) && (!type || kindKey(r.kind) === type));
+  const type = $('#pType').value, show = $('#pShow').value, ind = $('#pInd').value;
+  const sel = r => cias.includes(r.cia) && (!type || kindKey(r.kind) === type) && (!ind || indOk(r, ind));
+  const rs = S.records.filter(r => sel(r) && (!a || r.date >= a) && (!b || r.date <= b));
   const dates = rs.map(r => r.date).sort(), pa = a || dates[0] || '', pb = b || dates[dates.length - 1] || '';
   const per = pa && pb ? span(pa, pb) : 'Todo o período cadastrado';
-  const st = cias.map(c => [c, statsOf(rs.filter(r => r.cia === c))]).sort((x, y) => y[1]['Ocorrências'] - x[1]['Ocorrências']);
-  const tot = statsOf(rs), n = tot['Ocorrências'], cols = Object.keys(tot);
-  const SHORT = { 'Veículos recuperados': 'Veíc. recup.', 'Armas apreendidas': 'Armas', 'Ocorrências com drogas': 'C/ drogas', 'Tentativas de homicídio': 'Tentativas' };
+  const cmp = prodCmpRange(pa, pb), ps = cmp ? S.records.filter(r => sel(r) && r.date >= cmp[0] && r.date <= cmp[1]) : [];
+  const st = cias.map(c => [c, statsOf(rs.filter(r => r.cia === c)), statsOf(ps.filter(r => r.cia === c))]).sort((x, y) => y[1]['Ocorrências'] - x[1]['Ocorrências']);
+  const tot = statsOf(rs), ptot = statsOf(ps), n = tot['Ocorrências'];
+  const cols = ['Ocorrências', ...marked.map(c => c[1])];
+  const SHORT = { 'Veículos recuperados': 'Veíc. recup.', 'Armas apreendidas': 'Armas', 'Ocorrências com drogas': 'C/ drogas', 'Tentativas de homicídio': 'Tentativas', 'Ocorrências': 'Ocorr.' };
+  const scope = [ind ? `com ${lowName(indName(ind))}` : '', type ? `de “${kindLabel(type)}”` : ''].filter(Boolean).join(' ');
   let text;
   if (!cias.length) text = 'Marque ao menos uma CIA para gerar o relatório.';
-  else if (!n) text = `${per}: não houve ocorrências registradas${type ? ` de “${kindLabel(type)}”` : ''} para ${cias.length === 1 ? 'a CIA selecionada' : 'as CIAs selecionadas'}.`;
+  else if (!n) text = `${per}: não houve ocorrências registradas${scope ? ' ' + scope : ''} para ${cias.length === 1 ? 'a CIA selecionada' : 'as CIAs selecionadas'}.`;
   else {
-    const lead = k => { const x = st.slice().sort((p, q) => q[1][k] - p[1][k])[0]; return x[1][k] ? `${x[0]} (${fmtN(x[1][k])})` : ''; };
-    text = `${per}: ${cias.length === 1 ? `a ${cias[0]} registrou` : `as ${cias.length} CIAs selecionadas registraram`} ${pl(n, 'ocorrência', 'ocorrências')}${type ? ` de “${kindLabel(type)}”` : ''}. `;
-    if (cias.length > 1) text += `A ${st[0][0]} respondeu pelo maior número (${fmtN(st[0][1]['Ocorrências'])}, ${pct(st[0][1]['Ocorrências'] / n * 100)} do total)${st[1] && st[1][1]['Ocorrências'] ? `, seguida da ${st[1][0]} (${fmtN(st[1][1]['Ocorrências'])})` : ''}. `;
-    const ls = [['Conduções', 'conduções'], ['Flagrantes', 'flagrantes'], ['Armas apreendidas', 'armas apreendidas']].map(([k, l]) => cias.length > 1 && lead(k) ? `${l}: ${lead(k)}` : '').filter(Boolean);
-    text += `No total: ${pl(tot['Conduções'], 'condução', 'conduções')}, ${pl(tot['Flagrantes'], 'flagrante', 'flagrantes')}, ${fmtN(tot['TCO'])} TCO, ${pl(tot['Mandados'], 'mandado', 'mandados')}, ${pl(tot['Veículos recuperados'], 'veículo recuperado', 'veículos recuperados')} e ${pl(tot['Armas apreendidas'], 'arma apreendida', 'armas apreendidas')}.${ls.length ? ' Lideranças — ' + ls.join('; ') + '.' : ''}`;
+    text = `${per}: ${cias.length === 1 ? `a ${cias[0]} registrou` : `as ${cias.length} CIAs selecionadas registraram`} ${pl(n, 'ocorrência', 'ocorrências')}${scope ? ' ' + scope : ''}`;
+    if (cmp) { const p = ptot['Ocorrências']; text += !p ? ` (sem registros em ${span(cmp[0], cmp[1])} para comparar)` : n === p ? `, mesmo número de ${span(cmp[0], cmp[1])}` : `, ${n > p ? 'aumento' : 'redução'} de ${pct((n - p) / p * 100)} em relação a ${span(cmp[0], cmp[1])} (${fmtN(p)})`; }
+    text += '. ';
+    if (cias.length > 1) text += `A ${st[0][0]} respondeu pelo maior número (${fmtN(st[0][1]['Ocorrências'])}, ${pct(st[0][1]['Ocorrências'] / n * 100)} do total). `;
+    const leads = marked.map(([, l]) => { const x = st.slice().sort((p, q) => q[1][l] - p[1][l])[0]; return x && x[1][l] ? `${lowName(l)}: ${x[0]} (${fmtN(x[1][l])})` : ''; }).filter(Boolean);
+    if (cias.length > 1 && leads.length) text += 'Primeiro lugar — ' + leads.join('; ') + '.';
+    else if (marked.length) text += 'No total: ' + marked.map(([, l]) => `${lowName(l)}: ${fmtN(tot[l])}`).join('; ') + '.';
   }
   // matriz tipo × CIA
   const tk = r => kindLabel(kindKey(r.kind)) || 'Não informado';
   const tAll = countBy(rs, tk).sort((x, y) => y[1] - x[1]), tTop = tAll.slice(0, 15).map(x => x[0]);
   const cell = (t, c) => rs.filter(r => r.cia === c && (t === null ? !tTop.includes(tk(r)) : tk(r) === t)).length;
   const rowsT = tTop.map(t => [t, t]); if (tAll.length > 15) rowsT.push(['Demais tipos', null]);
-  const head = [' ', per, [type ? 'Tipo: ' + kindLabel(type) : 'Todos os tipos de ocorrência', cias.length ? cias.join(', ') : 'Nenhuma CIA marcada'].join(' · ')];
-  const multi = ['Ocorrências', ...IND.map(x => x[1]), 'Armas apreendidas'];
-  box.innerHTML = repHead('Relatório de Produtividade por CIA', `<strong>Período:</strong> ${per}`, head[2]) + `
+  const right = [ind ? 'Indicador: ' + indName(ind) : '', type ? 'Tipo: ' + kindLabel(type) : 'Todos os tipos', cias.length ? cias.join(', ') : 'Nenhuma CIA marcada'].filter(Boolean).join(' · ');
+  const warn = $('#pCmp').value === 'custom' && !cmp ? '<p class="nodata noprint">Informe as duas datas do período de comparação.</p>' : '';
+  box.innerHTML = repHead('Relatório de Produtividade por CIA', `<strong>Período:</strong> ${per}${cmp ? ` · <strong>Comparação:</strong> ${span(cmp[0], cmp[1])}` : ''}`, right) + warn + `
     <h3>Resumo</h3><p class="rep-text">${esc(text)}</p>
-    ${n && show !== 'type' ? `<h3>Total por CIA</h3>
+    ${n && show !== 'type' ? `<h3>Total por CIA${cmp ? ' (abaixo de cada número: comparação · variação)' : ''}</h3>
     <table class="matrix cia"><thead><tr><th>CIA</th>${cols.map(k => `<th class="n">${SHORT[k] || k}</th>`).join('')}<th class="n">% ocorr.</th></tr></thead><tbody>
-      ${st.map(([c, s]) => `<tr><td><strong>${esc(c)}</strong></td>${cols.map(k => `<td class="n">${fmtN(s[k])}</td>`).join('')}<td class="n">${pct(s['Ocorrências'] / n * 100)}</td></tr>`).join('')}
-      ${cias.length > 1 ? `<tr class="total"><td>Total</td>${cols.map(k => `<td class="n">${fmtN(tot[k])}</td>`).join('')}<td class="n">100%</td></tr>` : ''}
+      ${st.map(([c, s, p]) => `<tr><td><strong>${esc(c)}</strong></td>${cols.map(k => `<td class="n">${fmtN(s[k])}${cmp ? varCell(s[k], p[k]) : ''}</td>`).join('')}<td class="n">${pct(s['Ocorrências'] / n * 100)}</td></tr>`).join('')}
+      ${cias.length > 1 ? `<tr class="total"><td>Total</td>${cols.map(k => `<td class="n">${fmtN(tot[k])}${cmp ? varCell(tot[k], ptot[k]) : ''}</td>`).join('')}<td class="n">100%</td></tr>` : ''}
     </tbody></table>
-    <div class="rep-grid">${multi.map((k, i) => `<div><h3>${k} por CIA</h3><div class="hbars" data-m="${i}"></div></div>`).join('')}</div>` : ''}
+    <div class="rep-grid">${cols.map((k, i) => `<div><h3>${k} por CIA</h3><div class="hbars" data-m="${i}"></div></div>`).join('')}</div>` : ''}
     ${n && show !== 'total' ? `<h3>Ocorrências por tipo e por CIA</h3>
     <table class="matrix"><thead><tr><th>Tipo de ocorrência</th>${cias.map(c => `<th class="n">${esc(c)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>
       ${rowsT.map(([l, t]) => { const v = cias.map(c => cell(t, c)); return `<tr><td>${esc(l)}</td>${v.map(x => `<td class="n">${x || '–'}</td>`).join('')}<td class="n"><strong>${fmtN(v.reduce((p, q) => p + q, 0))}</strong></td></tr>`; }).join('')}
       <tr class="total"><td>Total</td>${cias.map(c => `<td class="n">${fmtN(rs.filter(r => r.cia === c).length)}</td>`).join('')}<td class="n">${fmtN(n)}</td></tr>
     </tbody></table>
     <div class="rep-grid">${st.filter(x => x[1]['Ocorrências']).map(([c], i) => `<div><h3>Tipos mais frequentes — ${esc(c)}</h3><div class="hbars" data-t="${i}"></div></div>`).join('')}</div>` : ''}
+    ${n && cias.length && marked.length ? `<h3 class="pod-h">Pódio por indicador — classificação das CIAs</h3>
+    <div class="podiums">${marked.map(([, l, c], i) => `<div class="podium-box"><h4><i data-c="${c}"></i>${esc(l)}</h4><div class="podium" data-pod="${i}"></div></div>`).join('')}</div>
+    <p class="legend"><i class="g1"></i>1º lugar<i class="g2"></i>2º lugar<i class="g3"></i>3º lugar${cmp ? ' · “ant.” = valor no período de comparação' : ''}</p>` : ''}
     ` + repFoot();
-  $$('[data-m]', box).forEach(el => hbars(el, st.map(([c, s]) => [c, s[multi[+el.dataset.m]]]), 12));
+  $$('[data-m]', box).forEach(el => hbars(el, st.map(([c, s]) => [c, s[cols[+el.dataset.m]]]), 12));
   const withData = st.filter(x => x[1]['Ocorrências']);
   $$('[data-t]', box).forEach(el => hbars(el, countBy(rs.filter(r => r.cia === withData[+el.dataset.t][0]), tk), 6));
+  $$('.podium-box [data-c]', box).forEach(el => { el.style.background = el.dataset.c; });
+  // pódio: CIAs ordenadas do maior para o menor; empates dividem a mesma posição
+  $$('[data-pod]', box).forEach(el => {
+    const l = marked[+el.dataset.pod][1];
+    const arr = st.map(([cia, s, p]) => [cia, s[l], p[l]]).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], 'pt-BR'));
+    const top = Math.max(1, ...arr.map(x => x[1]));
+    let place = 0, last = null;
+    el.innerHTML = arr.map(([cia, v, p], i) => {
+      if (v !== last) { place = i + 1; last = v; }
+      const cls = v > 0 && place <= 3 ? 'g' + place : '';
+      return `<div class="pc"><div class="bw"><span class="pos">${v > 0 ? place + 'º' : '–'}</span><span class="v">${fmtN(v)}</span><span class="bar ${cls}" data-h="${(v / top).toFixed(4)}"></span></div><span class="l">${esc(cia)}</span>${cmp ? `<span class="ant">ant.: ${fmtN(p)}</span>` : ''}</div>`;
+    }).join('');
+    $$('.bar', el).forEach(bar => { bar.style.height = `max(3px, calc((100% - 36px) * ${bar.dataset.h}))`; });
+  });
 }
 
 /* ---------- Backup ---------- */
@@ -1286,6 +1404,7 @@ function bind() {
   $('#btnPdfAll').addEventListener('click', () => { const boxes = $$('.pdfrec .inc'); const all = boxes.every(b => b.checked); boxes.forEach(b => b.checked = !all); updatePdfCount(); });
   $('#pdfList').addEventListener('change', e => { if (e.target.classList.contains('inc')) updatePdfCount(); });
 
+  document.addEventListener('change', e => { if (e.target.matches('.geo-f input')) geoFieldChanged(e.target); });
   $('#search').addEventListener('input', renderTable);
   $('#tbl').addEventListener('click', e => {
     const tr = e.target.closest('tr[data-id]'); if (!tr) return;
@@ -1293,8 +1412,11 @@ function bind() {
     if (e.target.closest('[data-remove]')) removeRec(tr.dataset.id);
   });
   $('#btnBk').addEventListener('click', importBackup);
-  ['#rKind', '#rRef', '#rFrom', '#rTo', '#rCia', '#rCity', '#rNb', '#rType', '#rCmp', '#rCFrom', '#rCTo', '#rTypes', '#rList'].forEach(id => $(id).addEventListener('change', renderReport));
-  ['#pFrom', '#pTo', '#pType', '#pShow'].forEach(id => $(id).addEventListener('change', renderProd));
+  ['#rKind', '#rRef', '#rFrom', '#rTo', '#rCia', '#rCity', '#rNb', '#rType', '#rInd', '#rCmp', '#rCFrom', '#rCTo', '#rTypes', '#rList'].forEach(id => $(id).addEventListener('change', renderReport));
+  ['#pFrom', '#pTo', '#pType', '#pShow', '#pInd', '#pCmp', '#pCFrom', '#pCTo'].forEach(id => $(id).addEventListener('change', renderProd));
+  $('#pInds').addEventListener('change', e => { if (e.target.checked) indOff.p.delete(e.target.value); else indOff.p.add(e.target.value); renderProd(); });
+  $('#rInds').addEventListener('change', e => { if (e.target.checked) indOff.r.delete(e.target.value); else indOff.r.add(e.target.value); renderReport(); });
+  $('#rInd').innerHTML = INDSEL; $('#pInd').innerHTML = INDSEL;
   $$('[data-prange]').forEach(b => b.addEventListener('click', () => setProdRange(b.dataset.prange)));
   $('#pCias').addEventListener('change', e => { if (e.target.checked) pOff.delete(e.target.value); else pOff.add(e.target.value); renderProd(); });
   $('#pAll').addEventListener('click', () => { const cias = uniq(S.records.map(r => r.cia)); if (pOff.size) pOff.clear(); else cias.forEach(c => pOff.add(c)); renderProd(); });

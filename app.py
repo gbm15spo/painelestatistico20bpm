@@ -63,6 +63,9 @@ def initialize():
           drugs TEXT NOT NULL DEFAULT '[]', guns TEXT NOT NULL DEFAULT '[]', notes TEXT NOT NULL DEFAULT '',
           source TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         )'''))
+        cols={x[0] for x in c.execute(text("SELECT * FROM records WHERE 1=0")).cursor.description}
+        for col in ('lat','lon'):
+            if col not in cols:c.execute(text(f'ALTER TABLE records ADD COLUMN {col} DOUBLE PRECISION'))
         c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS records_identify ON records(date, ref) WHERE ref != ''"))
         c.execute(text('''CREATE TABLE IF NOT EXISTS sessions (
           token_hash TEXT PRIMARY KEY, username TEXT NOT NULL,
@@ -110,9 +113,9 @@ def insert_records(records):
             uid=secrets.token_urlsafe(16)
             params={**r,'id':uid,'created_at':now,'updated_at':now,'drugs':json.dumps(r['drugs'],ensure_ascii=False),'guns':json.dumps(r['guns'],ensure_ascii=False)}
             c.execute(text('''INSERT INTO records(id,date,time,cia,city,neighborhood,location,ref,kind,crime_category,
-               conducoes,flagrantes,tco,mandados,veiculos,drugs,guns,notes,source,created_at,updated_at)
+               conducoes,flagrantes,tco,mandados,veiculos,drugs,guns,notes,source,lat,lon,created_at,updated_at)
                VALUES(:id,:date,:time,:cia,:city,:neighborhood,:location,:ref,:kind,:crime_category,
-               :conducoes,:flagrantes,:tco,:mandados,:veiculos,:drugs,:guns,:notes,:source,:created_at,:updated_at)'''),params)
+               :conducoes,:flagrantes,:tco,:mandados,:veiculos,:drugs,:guns,:notes,:source,:lat,:lon,:created_at,:updated_at)'''),params)
             inserted.append(uid)
     return {'inserted':len(inserted),'skipped':len(skipped),'skipped_refs':skipped}
 
@@ -215,6 +218,29 @@ def api_session():
 @app.get('/api/records')
 def api_records():
     return jsonify({'records':get_records(private=bool(session())),'admin':bool(session())})
+
+
+@app.post('/api/geo/resolve')
+def api_geo_resolve():
+    # Abre um link curto do Google Maps (maps.app.goo.gl) para obter o endereço completo, que contém a coordenada.
+    if not admin():return no_access()
+    body=json_body(); url=str(body.get('url','') if isinstance(body,dict) else '').strip()[:500]
+    from urllib.parse import urlsplit
+    import urllib.request
+    ok_hosts=('maps.app.goo.gl','goo.gl','maps.google.com','www.google.com','google.com','www.google.com.br','google.com.br')
+    if urlsplit(url).scheme!='https' or urlsplit(url).hostname not in ok_hosts:raise ValueError('Link do Google Maps inválido.')
+    class Guard(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            u=urlsplit(newurl)
+            if u.scheme!='https' or not (u.hostname or '').endswith(('google.com','google.com.br','goo.gl')):return None
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+    final=url
+    try:
+        req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+        with urllib.request.build_opener(Guard).open(req,timeout=8) as r:final=r.geturl()
+    except urllib.error.HTTPError as e:final=e.geturl() or url
+    except Exception:raise ValueError('Não foi possível abrir o link. Cole a coordenada (ex.: -9.4062, -38.2147).')
+    return jsonify({'url':final})
 
 
 @app.get('/api/geo')
@@ -371,7 +397,7 @@ def api_record_edit(uid):
         result=c.execute(text('''UPDATE records SET date=:date,time=:time,cia=:cia,city=:city,
           neighborhood=:neighborhood,location=:location,ref=:ref,kind=:kind,crime_category=:crime_category,
           conducoes=:conducoes,flagrantes=:flagrantes,tco=:tco,mandados=:mandados,veiculos=:veiculos,
-          drugs=:drugs,guns=:guns,notes=:notes,source=:source,updated_at=:updated_at WHERE id=:id'''),r)
+          drugs=:drugs,guns=:guns,notes=:notes,source=:source,lat=:lat,lon=:lon,updated_at=:updated_at WHERE id=:id'''),r)
     if result.rowcount!=1:return no_access('Ocorrência não encontrada.',404)
     return jsonify({'ok':True})
 

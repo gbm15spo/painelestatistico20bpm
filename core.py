@@ -147,6 +147,18 @@ def validate_record(d):
     r = {'date': date, 'time': t}
     for k, mx, required in [('cia',90,True),('city',100,True),('neighborhood',100,False),('location',350,False),('ref',90,False),('kind',120,False),('notes',750,False),('source',120,False)]:
         r[k] = clean_text(d.get(k), mx, k, required)
+    # Coordenada exata da ocorrência (opcional; visível só ao administrador)
+    lat, lon = d.get('lat'), d.get('lon')
+    if lat in (None, '') and lon in (None, ''):
+        r['lat'] = r['lon'] = None
+    else:
+        try:
+            lat, lon = float(lat), float(lon)
+        except (TypeError, ValueError):
+            raise ValueError('Coordenada inválida.')
+        if isinstance(d.get('lat'), bool) or not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError('Coordenada inválida.')
+        r['lat'], r['lon'] = round(lat, 6), round(lon, 6)
     cls=clean_text(d.get('crime_category',crime_type(r['kind'])),30,'classificação') or 'outros'
     if cls not in ('outros','homicidio','tentativa_homicidio'):raise ValueError('Classificação de crime inválida.')
     r['crime_category']=cls
@@ -185,7 +197,7 @@ def record_from_row(row, private=False):
     d['drugs'] = json.loads(d.pop('drugs'))
     d['guns'] = json.loads(d.pop('guns'))
     if not private:
-        for k in ('location','ref','notes','source','created_at','updated_at'):
+        for k in ('location','ref','notes','source','created_at','updated_at','lat','lon'):
             d.pop(k, None)
     return d
 
