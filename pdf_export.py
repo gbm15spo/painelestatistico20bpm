@@ -6,9 +6,9 @@ from html import escape
 
 CATS = {'homicidio': 'Homicídio', 'tentativa_homicidio': 'Tentativa de homicídio', 'outros': 'Outros'}
 # (título, largura relativa, alinhamento)
-COLS = [('Data', 5.2, 0), ('Hora', 3.6, 0), ('Nº', 6.5, 0), ('Natureza', 11, 0), ('Classif.', 6.5, 0), ('CIA', 5.5, 0),
+COLS = [('Data', 5.2, 0), ('Hora', 3.6, 0), ('Nº', 6.5, 0), ('Natureza', 10, 0), ('Classif.', 5.5, 0), ('CIA', 5.5, 0),
         ('Cidade', 7, 0), ('Bairro', 7.5, 0), ('Endereço / local', 13, 0), ('Cond.', 3.2, 1), ('Flag.', 3.2, 1),
-        ('TCO', 3, 1), ('Mand.', 3.3, 1), ('Veíc.', 3.2, 1), ('A.br.', 3.2, 1), ('Simul.', 3.4, 1), ('Adol.', 3.2, 1), ('Drogas', 8.5, 0), ('Armas de fogo', 7.5, 0), ('Observações', 9.5, 0)]
+        ('TCO', 3, 1), ('Mand.', 3.3, 1), ('Veíc.', 3.2, 1), ('A.br.', 3.2, 1), ('Simul.', 3.4, 1), ('Adol.', 3.2, 1), ('P.cond.', 3.6, 1), ('Presos', 3.6, 1), ('Drogas', 8.5, 0), ('Armas de fogo', 7.5, 0), ('Observações', 9.5, 0)]
 
 
 def _row(r):
@@ -19,7 +19,7 @@ def _row(r):
     n = lambda k: str(int(r.get(k, 0) or 0) or '')
     return [date, r.get('time', ''), r.get('ref', ''), r.get('kind', ''), CATS.get(r.get('crime_category'), 'Outros'),
             r.get('cia', ''), r.get('city', ''), r.get('neighborhood', ''), r.get('location', ''),
-            n('conducoes'), n('flagrantes'), n('tco'), n('mandados'), n('veiculos'), n('armas_brancas'), n('simulacros'), n('adolescentes'), drugs, guns, r.get('notes', '')]
+            n('conducoes'), n('flagrantes'), n('tco'), n('mandados'), n('veiculos'), n('armas_brancas'), n('simulacros'), n('adolescentes'), n('conduzidos'), n('presos'), drugs, guns, r.get('notes', '')]
 
 
 def build_pdf(records, username=''):

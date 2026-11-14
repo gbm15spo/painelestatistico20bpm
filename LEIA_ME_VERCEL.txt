@@ -32,6 +32,13 @@ ATUALIZAÇÃO (interface completa)
   Imprimir / Salvar em PDF), PRODUTIVIDADE POR CIA (marcar CIAs; total e por tipo de ocorrência),
   planilha Excel, PLANILHA EM PDF com todos os dados e backup JSON.
 
+USUÁRIOS E AUDITORIA
+- O administrador principal continua sendo ADMIN_USERNAME / ADMIN_PASSWORD_HASH (Vercel).
+- Na aba Usuários o administrador cria logins individuais: perfil Administrador ou Operador.
+  Operador cadastra, importa, edita, gera relatórios e exporta; não exclui nem gerencia usuários.
+- Cada pessoa troca a própria senha em "Minha senha". Desativar um usuário corta o acesso na hora.
+- A aba Auditoria mostra quem cadastrou, editou, excluiu (com cópia do registro) e entrou no sistema.
+
 OBSERVAÇÕES
 - São necessários três segredos/configurações: DATABASE_URL (ou POSTGRES_URL),
   ADMIN_USERNAME e ADMIN_PASSWORD_HASH. Sem banco configurado, o sistema avisa erro 503.

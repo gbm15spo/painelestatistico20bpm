@@ -7,7 +7,7 @@ from itertools import groupby
 from xml.sax.saxutils import escape
 from zipfile import ZipFile, ZIP_DEFLATED
 
-INDICATORS = [('conducoes','Conduções'),('flagrantes','Flagrantes'),('tco','TCO'),('mandados','Mandados'),('veiculos','Veículos recuperados'),('armas_brancas','Armas brancas apreendidas'),('simulacros','Simulacros apreendidos'),('adolescentes','Adolescentes apreendidos')]
+INDICATORS = [('conducoes','Conduções'),('flagrantes','Flagrantes'),('tco','TCO'),('mandados','Mandados'),('veiculos','Veículos recuperados'),('armas_brancas','Armas brancas apreendidas'),('simulacros','Simulacros apreendidos'),('adolescentes','Adolescentes apreendidos'),('conduzidos','Pessoas conduzidas'),('presos','Pessoas presas em flagrante')]
 
 def _col(n):
     s=''
@@ -38,7 +38,7 @@ def _sheet(rows):
 
 def build_xlsx(records):
     ordered=sorted(records,key=lambda r:(r.get('date',''),r.get('ref','')))
-    rows=[['Data','Horário','Número','Tipo','Classificação','CIA','Cidade','Bairro','Endereço / local','Conduções','Flagrantes','TCO','Mandados','Veículos recuperados','Armas brancas apreendidas','Simulacros apreendidos','Adolescentes apreendidos','Drogas detalhadas','Armas de fogo detalhadas','Observações','Origem']]
+    rows=[['Data','Horário','Número','Tipo','Classificação','CIA','Cidade','Bairro','Endereço / local','Conduções','Flagrantes','TCO','Mandados','Veículos recuperados','Armas brancas apreendidas','Simulacros apreendidos','Adolescentes apreendidos','Pessoas conduzidas','Pessoas presas em flagrante','Drogas detalhadas','Armas de fogo detalhadas','Observações','Origem','Grupo','Cadastrado por','Alterado por']]
     drugs=[['Data','Ocorrência','CIA','Cidade','Bairro','Droga','Quantidade','Unidade']]
     guns=[['Data','Ocorrência','CIA','Cidade','Bairro','Arma','Quantidade']]
     crimes=[['Data','Horário','Número','Crime','CIA','Cidade','Bairro','Local','Observações']]
@@ -50,7 +50,7 @@ def build_xlsx(records):
         cls=r.get('crime_category','outros')
         label={'homicidio':'Homicídio','tentativa_homicidio':'Tentativa de homicídio','outros':'Outros'}.get(cls,'Outros')
         base=[r.get('date',''),r.get('time',''),r.get('ref',''),r.get('kind',''),label,r.get('cia',''),r.get('city',''),r.get('neighborhood',''),r.get('location','')]
-        rows.append(base+[int(r.get(k,0)) for k,_ in INDICATORS]+['; '.join(f"{d['type']}: {d['qty']} {d.get('unit','g')}" for d in r.get('drugs',[])),'; '.join(f"{g['type']}: {g['qty']}" for g in r.get('guns',[])),r.get('notes',''),r.get('source','')])
+        rows.append(base+[int(r.get(k,0)) for k,_ in INDICATORS]+['; '.join(f"{d['type']}: {d['qty']} {d.get('unit','g')}" for d in r.get('drugs',[])),'; '.join(f"{g['type']}: {g['qty']}" for g in r.get('guns',[])),r.get('notes',''),r.get('source',''),'Atendimento social / apoio' if r.get('grupo')=='social' else 'Ocorrência policial',r.get('created_by',''),r.get('updated_by','')])
         for d in r.get('drugs',[]):drugs.append([r.get('date',''),r.get('ref',''),r.get('cia',''),r.get('city',''),r.get('neighborhood',''),d.get('type',''),d.get('qty',0),d.get('unit','')])
         for g in r.get('guns',[]):guns.append([r.get('date',''),r.get('ref',''),r.get('cia',''),r.get('city',''),r.get('neighborhood',''),g.get('type',''),g.get('qty',0)])
         if cls in ('homicidio','tentativa_homicidio'):

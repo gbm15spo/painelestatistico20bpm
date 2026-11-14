@@ -66,7 +66,7 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 .alert.error{background:#fbeaea;color:var(--err);border-color:#f0c6c3}
 .alert.info{background:#f1ecdc;color:var(--brand);border-color:#d9cfb2}
 
-.filters{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;align-items:end}
+.filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}
 .filters.flat{grid-template-columns:repeat(4,minmax(0,1fr))}
 #tab-relatorios .filters{grid-template-columns:repeat(5,minmax(0,1fr))}
 .checks{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
@@ -261,6 +261,11 @@ dialog h2{margin-bottom:14px}
   .report{border:0;box-shadow:none;max-width:none;margin:0;padding:0;font-size:10.5pt}
   .rep-grid{grid-template-columns:1fr 1fr}.rep-kpis{grid-template-columns:repeat(4,1fr)}
 }
+
+.nowrap{white-space:nowrap}
+#bFrom{flex:1 1 220px;width:auto}#bTo{flex:1 1 220px;width:auto}
+#auditSearch{max-width:340px}
+.top .btn.sm{font-size:.8rem}
 </style>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha256-65UqrlgGoRAnKfKRuriH3eeDrOhZgZo1SCenduc+SGo=" crossorigin="" defer></script>
@@ -276,7 +281,8 @@ dialog h2{margin-bottom:14px}
   </div>
   <div class="session">
     <span id="who" class="who hidden"></span>
-    <button id="btnLogin" class="btn ghost" type="button">Acesso administrativo</button>
+    <button id="btnPass" class="btn ghost sm hidden" type="button">Minha senha</button>
+    <button id="btnLogin" class="btn ghost" type="button">Entrar</button>
     <button id="btnLogout" class="btn ghost hidden" type="button">Sair</button>
   </div>
 </header>
@@ -289,6 +295,8 @@ dialog h2{margin-bottom:14px}
   <button type="button" data-tab="relatorios">Relatórios</button>
   <button type="button" data-tab="produtividade">Produtividade por CIA</button>
   <button type="button" data-tab="dados">Exportar / Backup</button>
+  <button type="button" data-tab="usuarios" data-role="admin">Usuários</button>
+  <button type="button" data-tab="auditoria" data-role="admin">Auditoria</button>
 </nav>
 
 <main>
@@ -303,6 +311,7 @@ dialog h2{margin-bottom:14px}
       <label>Cidade<select id="fCity"><option value="">Todas</option></select></label>
       <label>Tipo de ocorrência<select id="fType"><option value="">Todos</option></select></label>
       <label>Indicador<select id="fInd"><option value="">Todos</option><option value="conducoes">Conduções</option><option value="flagrantes">Flagrantes</option><option value="tco">TCO</option><option value="mandados">Mandados</option><option value="veiculos">Veículos recuperados</option><option value="armas">Armas de fogo apreendidas</option><option value="drogas">Ocorrências com drogas</option><option value="homicidios">Homicídios</option><option value="tentativas">Tentativas de homicídio</option><option value="armas_brancas">Armas brancas apreendidas</option><option value="simulacros">Simulacros apreendidos</option><option value="adolescentes">Adolescentes apreendidos</option><option value="outras">Outras ocorrências</option></select></label>
+      <label>Grupo<select id="fGrp"><option value="policial" selected>Ocorrências policiais</option><option value="social">Atendimento social / apoio</option><option value="">Todos</option></select></label>
       <label>Classificação<select id="fCat">
         <option value="">Todas</option>
         <option value="homicidio">Homicídio</option>
@@ -371,10 +380,15 @@ dialog h2{margin-bottom:14px}
       </div>
       <div class="table-wrap"><table id="tbl"><thead><tr>
         <th>Data</th><th>Hora</th><th>Nº</th><th>Natureza</th><th>Classif.</th><th>CIA</th><th>Cidade</th><th>Bairro</th>
-        <th title="Conduções">Cond.</th><th title="Flagrantes">Flag.</th><th>TCO</th><th title="Mandados">Mand.</th><th title="Veículos recuperados">Veíc.</th><th title="Armas brancas apreendidas">A. br.</th><th title="Simulacros apreendidos">Simul.</th><th title="Adolescentes apreendidos">Adol.</th><th>Apreensões</th><th></th>
+        <th title="Conduções">Cond.</th><th title="Flagrantes">Flag.</th><th>TCO</th><th title="Mandados">Mand.</th><th title="Veículos recuperados">Veíc.</th><th title="Armas brancas apreendidas">A. br.</th><th title="Simulacros apreendidos">Simul.</th><th title="Adolescentes apreendidos">Adol.</th><th title="Pessoas conduzidas">P. cond.</th><th title="Pessoas presas em flagrante">Presos</th><th>Apreensões</th><th></th>
       </tr></thead><tbody></tbody></table></div>
       <p id="tblInfo" class="muted small"></p>
     </div>
+    <form id="formBairro" class="card">
+      <h2>Padronizar bairro</h2>
+      <p class="muted">A escrita já é padronizada sozinha (maiúsculas, acentos, "BTN III"). Use isto para juntar um bairro digitado errado ou com outro nome ao nome correto, em todas as ocorrências da cidade.</p>
+      <div class="row-inline"><select id="bFrom"></select><input id="bTo" maxlength="100" placeholder="Nome correto do bairro" list="dlBairro"><button type="submit" class="btn primary">Trocar</button></div>
+    </form>
   </section>
 
   <!-- RELATÓRIOS -->
@@ -389,6 +403,7 @@ dialog h2{margin-bottom:14px}
       <label data-r="custom">Até<input type="date" id="rTo"></label>
       <label>Tipo de ocorrência<select id="rType"><option value="">Todos</option></select></label>
       <label>Indicador<select id="rInd"></select></label>
+      <label>Grupo<select id="rGrp"><option value="">Todos</option><option value="policial">Ocorrências policiais</option><option value="social">Atendimento social / apoio</option></select></label>
       <label>CIA<select id="rCia"><option value="">Todas</option></select></label>
       <label>Cidade<select id="rCity"><option value="">Todas</option></select></label>
       <label>Bairro<select id="rNb"><option value="">Todos</option></select></label>
@@ -419,6 +434,7 @@ dialog h2{margin-bottom:14px}
         <label>Até<input type="date" id="pTo"></label>
         <label>Tipo de ocorrência<select id="pType"><option value="">Todos</option></select></label>
         <label>Indicador<select id="pInd"></select></label>
+        <label>Grupo<select id="pGrp"><option value="">Todos</option><option value="policial">Ocorrências policiais</option><option value="social">Atendimento social / apoio</option></select></label>
         <label>Comparação<select id="pCmp">
           <option value="none">Sem comparação</option><option value="prev">Período anterior</option>
           <option value="year">Mesmo período do ano anterior</option><option value="custom">Outro período (escolher datas)</option>
@@ -441,6 +457,34 @@ dialog h2{margin-bottom:14px}
         <button type="button" class="btn primary" id="pPrint">Imprimir / Salvar em PDF</button></div>
     </div>
     <article id="prodReport" class="report"></article>
+  </section>
+
+  <!-- USUÁRIOS -->
+  <section id="tab-usuarios" class="tab">
+    <div class="card">
+      <h2>Usuários do sistema</h2>
+      <p class="muted"><strong>Administrador</strong>: faz tudo, inclusive criar usuários, ver a auditoria e excluir ocorrências. <strong>Operador</strong>: cadastra, importa PDF, edita, gera relatórios e exporta, mas não exclui ocorrências nem mexe em usuários.</p>
+      <div id="usersBox" class="table-wrap"></div>
+    </div>
+    <form id="formUser" class="card" autocomplete="off">
+      <h2>Novo usuário</h2>
+      <div class="grid">
+        <label>Usuário (para entrar)<input name="username" required maxlength="40" placeholder="Ex.: sgt.silva ou matrícula" autocomplete="off"></label>
+        <label>Nome<input name="name" required maxlength="80" placeholder="Posto/graduação e nome"></label>
+        <label>Perfil<select name="role"><option value="operador">Operador</option><option value="admin">Administrador</option></select></label>
+        <label class="wide">Senha inicial (mínimo 8 caracteres, com letras e números)<input name="password" type="password" required minlength="8" maxlength="200" autocomplete="new-password"></label>
+      </div>
+      <div class="actions"><button type="submit" class="btn primary">Criar usuário</button></div>
+    </form>
+  </section>
+
+  <!-- AUDITORIA -->
+  <section id="tab-auditoria" class="tab">
+    <div class="card">
+      <div class="card-h"><h2>Auditoria — quem fez o quê</h2><input type="search" id="auditSearch" placeholder="Buscar usuário, ação, nº da ocorrência…"></div>
+      <div id="auditBox" class="table-wrap"></div>
+      <p id="auditInfo" class="muted small"></p>
+    </div>
   </section>
 
   <!-- DADOS -->
@@ -480,7 +524,7 @@ dialog h2{margin-bottom:14px}
 
 <dialog id="dlgLogin">
   <form id="formLogin" method="dialog">
-    <h2>Acesso administrativo</h2>
+    <h2>Entrar no sistema</h2>
     <label>Usuário<input name="username" autocomplete="username" required></label>
     <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
     <p id="loginErr" class="err hidden"></p>
@@ -491,9 +535,20 @@ dialog h2{margin-bottom:14px}
   </form>
 </dialog>
 
+<dialog id="dlgPass">
+  <form id="formPass" method="dialog">
+    <h2>Trocar minha senha</h2>
+    <label>Senha atual<input name="current" type="password" autocomplete="current-password" required></label>
+    <label>Senha nova (mínimo 8 caracteres, com letras e números)<input name="new1" type="password" autocomplete="new-password" required minlength="8"></label>
+    <label>Repita a senha nova<input name="new2" type="password" autocomplete="new-password" required minlength="8"></label>
+    <p id="passErr" class="err hidden"></p>
+    <div class="actions"><button type="button" class="btn ghost" data-close>Cancelar</button><button type="submit" class="btn primary">Trocar senha</button></div>
+  </form>
+</dialog>
+
 <dialog id="dlgEdit" class="wide">
   <form id="formEdit" class="editor" method="dialog">
-    <div class="card-h"><h2>Editar ocorrência</h2></div>
+    <div class="card-h"><h2>Editar ocorrência</h2><span id="editBy" class="muted small"></span></div>
     <div class="ed-body"></div>
     <div class="actions">
       <button type="button" class="btn ghost" data-close>Cancelar</button>
@@ -506,10 +561,11 @@ dialog h2{margin-bottom:14px}
 (() => {
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const S = { admin: false, csrf: null, user: null, records: [], pdf: [], geo: {}, kinds: new Map() };
+const S = { admin: false, csrf: null, user: null, role: null, name: null, master: false, records: [], pdf: [], geo: {}, kinds: new Map() };
 const CATS = { outros: 'Outros', homicidio: 'Homicídio', tentativa_homicidio: 'Tentativa de homicídio' };
-const IND = [['conducoes','Conduções'],['flagrantes','Flagrantes'],['tco','TCO'],['mandados','Mandados'],['veiculos','Veículos recuperados'],['armas_brancas','Armas brancas apreendidas'],['simulacros','Simulacros apreendidos'],['adolescentes','Adolescentes apreendidos']];
-const IND_SHORT = { conducoes: 'Cond.', flagrantes: 'Flag.', tco: 'TCO', mandados: 'Mand.', veiculos: 'Veíc.', armas_brancas: 'A. br.', simulacros: 'Simul.', adolescentes: 'Adol.' };
+const IND = [['conducoes','Conduções'],['flagrantes','Flagrantes'],['tco','TCO'],['mandados','Mandados'],['veiculos','Veículos recuperados'],['armas_brancas','Armas brancas apreendidas'],['simulacros','Simulacros apreendidos'],['adolescentes','Adolescentes apreendidos'],['conduzidos','Pessoas conduzidas'],['presos','Pessoas presas em flagrante']];
+const GRP = { policial: 'Ocorrência policial', social: 'Atendimento social / apoio' };
+const IND_SHORT = { conducoes: 'Cond.', flagrantes: 'Flag.', tco: 'TCO', mandados: 'Mand.', veiculos: 'Veíc.', armas_brancas: 'A. br.', simulacros: 'Simul.', adolescentes: 'Adol.', conduzidos: 'P. cond.', presos: 'Presos' };
 const indHead = () => IND.map(([k, l]) => `<th class="n" title="${l}">${IND_SHORT[k]}</th>`).join('');
 const UNITS = ['g','kg','porções','unidades','comprimidos','ml','L','pés'];
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -545,7 +601,7 @@ function notify(msg, kind = 'ok') {
 async function refreshSession() {
   try {
     const s = await api('/api/session');
-    S.admin = !!s.admin; S.user = s.username; S.csrf = s.csrf;
+    S.admin = !!s.admin; S.user = s.username; S.csrf = s.csrf; S.role = s.role; S.name = s.name; S.master = !!s.master;
   } catch (e) { S.admin = false; S.csrf = null; }
   renderSession();
 }
@@ -553,7 +609,9 @@ function renderSession() {
   $('#btnLogin').classList.toggle('hidden', S.admin);
   $('#btnLogout').classList.toggle('hidden', !S.admin);
   $('#who').classList.toggle('hidden', !S.admin);
-  $('#who').textContent = S.admin ? 'Administrador: ' + S.user : '';
+  $('#who').textContent = S.admin ? `${S.name || S.user} · ${S.role === 'admin' ? 'Administrador' : 'Operador'}` : '';
+  $$('[data-role=admin]').forEach(e => e.classList.toggle('hidden', S.role !== 'admin'));
+  $('#btnPass').classList.toggle('hidden', !S.admin || S.master);
   $('#tabs').classList.toggle('hidden', !S.admin);
   if (!S.admin) showTab('painel');
 }
@@ -563,6 +621,8 @@ function showTab(name) {
   if (name === 'registros') renderTable();
   if (name === 'relatorios') renderReport();
   if (name === 'produtividade') renderProd();
+  if (name === 'usuarios') loadUsers();
+  if (name === 'auditoria') loadAudit();
   if (name === 'painel') { if (map) map.invalidateSize(); renderDashboard(); }
 }
 
@@ -576,7 +636,7 @@ async function loadRecords() {
   }
   await loadGeo(); buildKinds();
   renderLists(); renderFilters(); renderDashboard();
-  if (S.admin) { renderTable(); renderReport(); renderProd(); }
+  if (S.admin) { renderTable(); renderReport(); renderProd(); fillBairroTool(); }
 }
 
 /* ---------- Painel ---------- */
@@ -610,9 +670,9 @@ function renderLists() {
   set('#dlCity', uniq(S.records.map(r => r.city)));
   set('#dlBairro', uniq(S.records.map(r => r.neighborhood)));
 }
-function filtered() {
-  const f = { from: $('#fFrom').value, to: $('#fTo').value, cia: $('#fCia').value, city: $('#fCity').value, cat: $('#fCat').value, type: $('#fType').value, ind: $('#fInd').value };
-  return S.records.filter(r => (!f.from || r.date >= f.from) && (!f.to || r.date <= f.to)
+function filtered(all) {
+  const f = { from: $('#fFrom').value, to: $('#fTo').value, cia: $('#fCia').value, city: $('#fCity').value, cat: $('#fCat').value, type: $('#fType').value, ind: $('#fInd').value, grp: all ? '' : $('#fGrp').value };
+  return S.records.filter(r => (!f.grp || r.grupo === f.grp) && (!f.from || r.date >= f.from) && (!f.to || r.date <= f.to)
     && (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.cat || r.crime_category === f.cat) && (!f.type || kindKey(r.kind) === f.type) && (!f.ind || indOk(r, f.ind)));
 }
 function hbars(box, entries, max = 10) {
@@ -634,8 +694,9 @@ function renderDashboard() {
   const ten = rs.filter(r => r.crime_category === 'tentativa_homicidio').length;
 
   const dates = rs.map(r => r.date).sort();
-  $('#periodo').textContent = rs.length
-    ? `${fmtN(rs.length)} ocorrência(s) · de ${fmtD(dates[0])} a ${fmtD(dates[dates.length - 1])}` : '';
+  const grp = $('#fGrp').value, outside = grp ? filtered(true).length - rs.length : 0;
+  $('#periodo').textContent = (rs.length ? `${fmtN(rs.length)} ${grp === 'policial' ? 'ocorrência(s) policiais' : grp === 'social' ? 'atendimento(s) sociais / de apoio' : 'ocorrência(s)'} · de ${fmtD(dates[0])} a ${fmtD(dates[dates.length - 1])}` : '')
+    + (outside ? `${rs.length ? ' · ' : ''}mais ${fmtN(outside)} ${grp === 'policial' ? 'atendimento(s) sociais / de apoio' : 'ocorrência(s) policiais'} fora desta contagem (mude o filtro "Grupo" para ver)` : '');
   $('#empty').classList.toggle('hidden', rs.length > 0);
 
   const k = [['Ocorrências', rs.length], ...IND.map(([f, l]) => [l, sum(f)]), ['Armas de fogo apreendidas', armas],
@@ -885,6 +946,7 @@ function editorHTML(r = {}) {
     <label>Bairro<input name="neighborhood" list="dlBairro" maxlength="100" value="${v('neighborhood')}"></label>
     <label class="wide">Endereço / local<input name="location" maxlength="350" value="${v('location')}"></label>
     <label class="wide geo-f">Coordenada ou link do Google Maps<span class="geo-row"><input name="geo" maxlength="500" placeholder="Ex.: -9.4062, -38.2147 ou https://maps.app.goo.gl/…" value="${r.lat != null && r.lon != null ? r.lat + ', ' + r.lon : ''}"><a class="btn sm ghost geo-open${r.lat != null ? '' : ' hidden'}" target="_blank" rel="noopener" href="${r.lat != null ? 'https://www.google.com/maps?q=' + r.lat + ',' + r.lon : '#'}">Ver no mapa</a></span><small class="geo-msg"></small></label>
+    <label>Grupo<select name="grupo"><option value="">Automático (pelo tipo)</option>${Object.entries(GRP).map(([k, l]) => `<option value="${k}"${r.grupo === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
     <label>Classificação<select name="crime_category">${Object.entries(CATS).map(([k, l]) => `<option value="${k}"${(r.crime_category || 'outros') === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
     <label class="wide">Tipo / natureza<input name="kind" maxlength="120" placeholder="Ex.: Tráfico de drogas" value="${v('kind')}"></label>
   </div>
@@ -901,7 +963,7 @@ function editorHTML(r = {}) {
 function readEditor(root) {
   const g = n => { const el = root.querySelector(`[name="${n}"]`); return el ? el.value.trim() : ''; };
   const rec = {};
-  ['date','time','ref','cia','city','neighborhood','location','kind','crime_category','notes','source'].forEach(k => rec[k] = g(k));
+  ['date','time','ref','cia','city','neighborhood','location','kind','crime_category','grupo','notes','source'].forEach(k => rec[k] = g(k));
   IND.forEach(([k]) => { const n = parseInt(g(k), 10); rec[k] = Number.isFinite(n) && n > 0 ? n : 0; });
   const gv = g('geo'), c = parseCoords(gv);
   rec.lat = c ? c[0] : null; rec.lon = c ? c[1] : null; rec._geoBad = !!gv && !c;
@@ -1037,14 +1099,17 @@ function renderTable() {
     const ap = [...(r.drugs || []).map(d => `${d.type}: ${d.qty} ${d.unit || 'g'}`), ...(r.guns || []).map(g => `${g.type}: ${g.qty}`)].join('; ');
     return `<tr data-id="${esc(r.id)}"><td>${fmtD(r.date)}</td><td>${esc(r.time)}</td><td>${esc(r.ref)}</td><td>${esc(r.kind)}</td><td>${tag}</td><td>${esc(r.cia)}</td><td>${esc(r.city)}</td><td>${esc(r.neighborhood)}</td>
       ${IND.map(([k]) => `<td class="n">${+r[k] || ''}</td>`).join('')}<td class="small">${esc(ap)}</td>
-      <td class="acts">${r.lat != null ? `<a class="btn sm ghost" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${r.lat},${r.lon}" title="Abrir a coordenada no Google Maps">Mapa</a> ` : ''}<button type="button" class="btn sm" data-edit>Editar</button> <button type="button" class="btn sm ghost danger" data-remove>Excluir</button></td></tr>`;
-  }).join('') || '<tr><td colspan="18" class="muted">Nenhuma ocorrência encontrada.</td></tr>';
+      <td class="acts">${r.lat != null ? `<a class="btn sm ghost" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${r.lat},${r.lon}" title="Abrir a coordenada no Google Maps">Mapa</a> ` : ''}<button type="button" class="btn sm" data-edit>Editar</button> ${S.role === 'admin' ? '<button type="button" class="btn sm ghost danger" data-remove>Excluir</button>' : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="20" class="muted">Nenhuma ocorrência encontrada.</td></tr>';
   $('#tblInfo').textContent = `${fmtN(rs.length)} registro(s)` + (rs.length > shown.length ? ` · exibindo os ${shown.length} mais recentes; refine a busca.` : '');
 }
 let editingId = null;
 function openEdit(id) {
   const r = S.records.find(x => x.id === id); if (!r) return;
-  editingId = id; mountEditor($('#formEdit'), r); $('#dlgEdit').showModal();
+  editingId = id; mountEditor($('#formEdit'), r);
+  const when = t => t ? new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+  $('#editBy').textContent = [r.created_by ? `Cadastrada por ${r.created_by} em ${when(r.created_at)}` : '', r.updated_by && r.updated_at !== r.created_at ? `última alteração por ${r.updated_by} em ${when(r.updated_at)}` : ''].filter(Boolean).join(' · ');
+  $('#dlgEdit').showModal();
 }
 async function saveEdit(ev) {
   ev.preventDefault();
@@ -1093,7 +1158,7 @@ function shiftYear(s, n) {
   return isNaN(d) || isoU(d) !== t ? (+s.slice(0, 4) + n) + '-02-28' : t; // 29/02 em ano não bissexto
 }
 function statsOf(rs) {
-  const s = { 'Ocorrências': rs.length };
+  const s = { 'Ocorrências': rs.length, 'Ocorrências policiais': rs.filter(r => r.grupo !== 'social').length, 'Atendimentos sociais / apoio': rs.filter(r => r.grupo === 'social').length };
   IND.forEach(([k, l]) => { s[l] = rs.reduce((a, r) => a + (+r[k] || 0), 0); });
   s['Armas de fogo apreendidas'] = rs.reduce((a, r) => a + (r.guns || []).reduce((x, g) => x + (+g.qty || 0), 0), 0);
   s['Ocorrências com drogas'] = rs.filter(r => (r.drugs || []).length).length;
@@ -1191,13 +1256,13 @@ function renderReport() {
   $$('[data-r=cmp]').forEach(e => e.classList.toggle('hidden', cmpMode !== 'custom'));
   $$('[data-r=types]').forEach(e => e.classList.toggle('hidden', cmpMode === 'none'));
   const [kind, a, b] = repRange(), cmp = cmpRange(kind, a, b);
-  const f = { cia: $('#rCia').value, city: $('#rCity').value, nb: $('#rNb').value, type: $('#rType').value, ind: $('#rInd').value };
+  const f = { cia: $('#rCia').value, city: $('#rCity').value, nb: $('#rNb').value, type: $('#rType').value, ind: $('#rInd').value, grp: $('#rGrp').value };
   const marked = indChecks($('#rInds'), 'r');
-  const base = S.records.filter(r => (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.nb || r.neighborhood === f.nb) && (!f.type || kindKey(r.kind) === f.type) && (!f.ind || indOk(r, f.ind)));
+  const base = S.records.filter(r => (!f.cia || r.cia === f.cia) && (!f.city || r.city === f.city) && (!f.nb || r.neighborhood === f.nb) && (!f.type || kindKey(r.kind) === f.type) && (!f.ind || indOk(r, f.ind)) && (!f.grp || r.grupo === f.grp));
   const within = (x, y) => base.filter(r => r.date >= x && r.date <= y);
   const rs = within(a, b).sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
   const ps = cmp ? within(cmp[0], cmp[1]) : [];
-  const cur = statsOf(rs), prev = statsOf(ps), keys = ['Ocorrências', ...marked.map(c => c[1])];
+  const cur = statsOf(rs), prev = statsOf(ps), keys = ['Ocorrências', ...(f.grp ? [] : ['Ocorrências policiais', 'Atendimentos sociais / apoio']), ...marked.map(c => c[1])];
   // evolução
   const g = granOf(kind, a, b), labels = bucketLabels(g, a, b), cb = labels.map(() => 0), pb = labels.map(() => 0);
   rs.forEach(r => { cb[bucketIdx(g, r.date, r.time, a)]++; });
@@ -1207,11 +1272,11 @@ function renderReport() {
   const tk = r => kindLabel(kindKey(r.kind)) || 'Não informado', tc = new Map(countBy(rs, tk)), tp = new Map(countBy(ps, tk));
   const types = [...new Set([...tc.keys(), ...tp.keys()])].map(k => [k, tc.get(k) || 0, tp.get(k) || 0]).sort((x, y) => y[1] - x[1] || y[2] - x[2]).slice(0, 12);
   const [drugs, guns] = seizures(rs), viol = rs.filter(r => r.crime_category !== 'outros');
-  const filt = [f.ind ? 'Indicador: ' + indName(f.ind) : '', f.type ? 'Tipo: ' + kindLabel(f.type) : '', f.cia || 'Todas as CIAs', f.nb ? 'Bairro: ' + f.nb : '', f.city || (f.nb ? '' : 'Todas as cidades')].filter(Boolean).join(' · ');
+  const filt = [f.grp ? 'Grupo: ' + GRP[f.grp] : '', f.ind ? 'Indicador: ' + indName(f.ind) : '', f.type ? 'Tipo: ' + kindLabel(f.type) : '', f.cia || 'Todas as CIAs', f.nb ? 'Bairro: ' + f.nb : '', f.city || (f.nb ? '' : 'Todas as cidades')].filter(Boolean).join(' · ');
   const warn = cmpMode === 'custom' && !cmp ? '<p class="nodata noprint">Informe as duas datas do período de comparação.</p>' : '';
   box.innerHTML = repHead(`Relatório Operacional ${PER[kind]}`, `<strong>Período:</strong> ${span(a, b)}${cmp ? ` · <strong>Comparação:</strong> ${span(cmp[0], cmp[1])}` : ''}`, filt) + warn + `
     <h3>Resumo</h3><p class="rep-text">${esc(reportText(f, a, b, cur, rs, cmp, prev))}</p>
-    <div class="rep-kpis">${keys.slice(0, 4).map(k => { const [c, t] = variation(cur[k], prev[k]); return `<div><b>${fmtN(cur[k])}</b><span>${k}</span>${cmp ? `<em class="${c}">${t}</em>` : ''}</div>`; }).join('')}</div>
+    <div class="rep-kpis">${['Ocorrências', ...marked.map(c => c[1])].slice(0, 4).map(k => { const [c, t] = variation(cur[k], prev[k]); return `<div><b>${fmtN(cur[k])}</b><span>${k}</span>${cmp ? `<em class="${c}">${t}</em>` : ''}</div>`; }).join('')}</div>
     <h3>${cmp ? 'Indicadores e variação em relação ao período de comparação' : 'Indicadores do período'}</h3>
     <table><thead><tr><th>Indicador</th><th class="n">Período</th>${cmp ? '<th class="n">Comparação</th><th class="n">Diferença</th><th class="n">Variação</th>' : ''}</tr></thead><tbody>
       ${keys.map(k => { const [c, t] = variation(cur[k], prev[k]), d = cur[k] - prev[k]; return `<tr><td>${k}</td><td class="n"><strong>${fmtN(cur[k])}</strong></td>${cmp ? `<td class="n">${fmtN(prev[k])}</td><td class="n">${d > 0 ? '+' : d < 0 ? '−' : ''}${fmtN(Math.abs(d))}</td><td class="n ${c}"><strong>${t}</strong></td>` : ''}</tr>`; }).join('')}
@@ -1245,16 +1310,18 @@ function shiftReport(dir) {
 
 /* ---------- Indicadores fixos nos relatórios (marcar/desmarcar) ---------- */
 const indOff = { r: new Set(), p: new Set() };
+// nos relatórios entram também as contagens de pessoas (que não são categoria do mapa)
+const REP_CATS = [...MAP_CATS, ['conduzidos', 'Pessoas conduzidas', '#35506b', r => +r.conduzidos || 0], ['presos', 'Pessoas presas em flagrante', '#5b2a86', r => +r.presos || 0]];
 function indChecks(box, which) {
   const off = indOff[which];
-  box.innerHTML = MAP_CATS.map(([id, l, c]) => `<label><input type="checkbox" value="${id}"${off.has(id) ? '' : ' checked'}><i data-c="${c}"></i>${esc(l)}</label>`).join('');
+  box.innerHTML = REP_CATS.map(([id, l, c]) => `<label><input type="checkbox" value="${id}"${off.has(id) ? '' : ' checked'}><i data-c="${c}"></i>${esc(l)}</label>`).join('');
   $$('[data-c]', box).forEach(el => { el.style.background = el.dataset.c; });
-  return MAP_CATS.filter(c => !off.has(c[0]));
+  return REP_CATS.filter(c => !off.has(c[0]));
 }
 const lowName = l => l.replace(/^(?!TCO)./, ch => ch.toLowerCase());
 const SELNAME = { conducoes: 'Só com conduções', flagrantes: 'Só com flagrantes', tco: 'Só com TCO', mandados: 'Só com mandados', veiculos: 'Só com veículos recuperados', armas: 'Só com armas apreendidas', drogas: 'Só ocorrências com drogas', homicidios: 'Só homicídios', tentativas: 'Só tentativas de homicídio', armas_brancas: 'Só com armas brancas apreendidas', simulacros: 'Só com simulacros apreendidos', adolescentes: 'Só com adolescentes apreendidos' };
 const INDSEL = `<option value="">Todas as ocorrências</option>${MAP_CATS.map(([id]) => `<option value="${id}">${SELNAME[id]}</option>`).join('')}<option value="outras">Só outras ocorrências</option>`;
-const indName = id => id === 'outras' ? 'Outras ocorrências' : (MAP_CATS.find(c => c[0] === id) || [, ''])[1];
+const indName = id => id === 'outras' ? 'Outras ocorrências' : (REP_CATS.find(c => c[0] === id) || [, ''])[1];
 const varCell = (c, p) => { const [cl, t] = variation(c, p); return `<small class="vc ${cl}">${fmtN(p)} · ${t.replace(' sem registro na comparação', ' novo').replace('= sem variação', '=')}</small>`; };
 
 /* ---------- Produtividade por CIA (somente administrador) ---------- */
@@ -1283,8 +1350,8 @@ function renderProd() {
   const marked = indChecks($('#pInds'), 'p');
   $$('[data-p=cmp]').forEach(e => e.classList.toggle('hidden', $('#pCmp').value !== 'custom'));
   let a = $('#pFrom').value, b = $('#pTo').value; if (a && b && a > b) [a, b] = [b, a];
-  const type = $('#pType').value, show = $('#pShow').value, ind = $('#pInd').value;
-  const sel = r => cias.includes(r.cia) && (!type || kindKey(r.kind) === type) && (!ind || indOk(r, ind));
+  const type = $('#pType').value, show = $('#pShow').value, ind = $('#pInd').value, grp = $('#pGrp').value;
+  const sel = r => cias.includes(r.cia) && (!type || kindKey(r.kind) === type) && (!ind || indOk(r, ind)) && (!grp || r.grupo === grp);
   const rs = S.records.filter(r => sel(r) && (!a || r.date >= a) && (!b || r.date <= b));
   const dates = rs.map(r => r.date).sort(), pa = a || dates[0] || '', pb = b || dates[dates.length - 1] || '';
   const per = pa && pb ? span(pa, pb) : 'Todo o período cadastrado';
@@ -1292,7 +1359,7 @@ function renderProd() {
   const st = cias.map(c => [c, statsOf(rs.filter(r => r.cia === c)), statsOf(ps.filter(r => r.cia === c))]).sort((x, y) => y[1]['Ocorrências'] - x[1]['Ocorrências']);
   const tot = statsOf(rs), ptot = statsOf(ps), n = tot['Ocorrências'];
   const cols = ['Ocorrências', ...marked.map(c => c[1])];
-  const SHORT = { 'Veículos recuperados': 'Veíc. recup.', 'Armas de fogo apreendidas': 'Armas fogo', 'Armas brancas apreendidas': 'A. brancas', 'Simulacros apreendidos': 'Simul.', 'Adolescentes apreendidos': 'Adolesc.', 'Ocorrências com drogas': 'C/ drogas', 'Tentativas de homicídio': 'Tentativas', 'Ocorrências': 'Ocorr.' };
+  const SHORT = { 'Veículos recuperados': 'Veíc. recup.', 'Armas de fogo apreendidas': 'Armas fogo', 'Armas brancas apreendidas': 'A. brancas', 'Simulacros apreendidos': 'Simul.', 'Adolescentes apreendidos': 'Adolesc.', 'Pessoas conduzidas': 'P. conduz.', 'Pessoas presas em flagrante': 'P. presas', 'Ocorrências com drogas': 'C/ drogas', 'Tentativas de homicídio': 'Tentativas', 'Ocorrências': 'Ocorr.' };
   const scope = [ind ? `com ${lowName(indName(ind))}` : '', type ? `de “${kindLabel(type)}”` : ''].filter(Boolean).join(' ');
   let text;
   if (!cias.length) text = 'Marque ao menos uma CIA para gerar o relatório.';
@@ -1311,7 +1378,7 @@ function renderProd() {
   const tAll = countBy(rs, tk).sort((x, y) => y[1] - x[1]), tTop = tAll.slice(0, 15).map(x => x[0]);
   const cell = (t, c) => rs.filter(r => r.cia === c && (t === null ? !tTop.includes(tk(r)) : tk(r) === t)).length;
   const rowsT = tTop.map(t => [t, t]); if (tAll.length > 15) rowsT.push(['Demais tipos', null]);
-  const right = [ind ? 'Indicador: ' + indName(ind) : '', type ? 'Tipo: ' + kindLabel(type) : 'Todos os tipos', cias.length ? cias.join(', ') : 'Nenhuma CIA marcada'].filter(Boolean).join(' · ');
+  const right = [grp ? 'Grupo: ' + GRP[grp] : '', ind ? 'Indicador: ' + indName(ind) : '', type ? 'Tipo: ' + kindLabel(type) : 'Todos os tipos', cias.length ? cias.join(', ') : 'Nenhuma CIA marcada'].filter(Boolean).join(' · ');
   const warn = $('#pCmp').value === 'custom' && !cmp ? '<p class="nodata noprint">Informe as duas datas do período de comparação.</p>' : '';
   box.innerHTML = repHead('Relatório de Produtividade por CIA', `<strong>Período:</strong> ${per}${cmp ? ` · <strong>Comparação:</strong> ${span(cmp[0], cmp[1])}` : ''}`, right) + warn + `
     <h3>Resumo</h3><p class="rep-text">${esc(text)}</p>
@@ -1350,6 +1417,59 @@ function renderProd() {
   });
 }
 
+/* ---------- Usuários e auditoria (perfil Administrador) ---------- */
+async function loadUsers() {
+  if (S.role !== 'admin') return;
+  try {
+    const j = await api('/api/users');
+    $('#usersBox').innerHTML = `<table><thead><tr><th>Usuário</th><th>Nome</th><th>Perfil</th><th>Situação</th><th></th></tr></thead><tbody>${j.users.map(u => `<tr data-u="${esc(u.username)}">
+      <td><strong>${esc(u.username)}</strong></td><td>${esc(u.name)}</td><td>${u.role === 'admin' ? 'Administrador' : 'Operador'}</td><td>${u.active ? 'Ativo' : '<span class="err">Desativado</span>'}</td>
+      <td class="acts">${u.master ? '<span class="muted small">configurado na Vercel</span>' : `<button type="button" class="btn sm" data-ureset>Redefinir senha</button> <button type="button" class="btn sm" data-urole="${u.role === 'admin' ? 'operador' : 'admin'}">Tornar ${u.role === 'admin' ? 'operador' : 'administrador'}</button> <button type="button" class="btn sm ghost ${u.active ? 'danger' : ''}" data-uact="${u.active ? 0 : 1}">${u.active ? 'Desativar' : 'Reativar'}</button>`}</td></tr>`).join('')}</tbody></table>`;
+  } catch (e) { notify(e.message, 'error'); }
+}
+async function userAction(u, body, msg) {
+  try { await api('/api/users/' + encodeURIComponent(u), { method: 'PUT', body }); notify(msg); loadUsers(); } catch (e) { notify(e.message, 'error'); }
+}
+async function createUser(ev) {
+  ev.preventDefault(); const f = ev.target;
+  try {
+    await api('/api/users', { method: 'POST', body: { username: f.username.value.trim(), name: f.name.value.trim(), password: f.password.value, role: f.role.value } });
+    notify(`Usuário ${f.username.value.trim()} criado. Passe a senha à pessoa e peça que troque no primeiro acesso.`); f.reset(); loadUsers();
+  } catch (e) { notify(e.message, 'error'); }
+}
+let auditRows = [];
+async function loadAudit() {
+  if (S.role !== 'admin') return;
+  try { auditRows = (await api('/api/audit')).entries; renderAudit(); } catch (e) { notify(e.message, 'error'); }
+}
+function renderAudit() {
+  const q = nrm($('#auditSearch').value);
+  const rows = auditRows.filter(a => !q || nrm([a.username, a.action, a.target, a.detail].join(' ')).includes(q));
+  $('#auditBox').innerHTML = `<table><thead><tr><th>Data e hora</th><th>Usuário</th><th>Ação</th><th>Sobre</th><th>Detalhe</th></tr></thead><tbody>${rows.map(a => {
+    const d = a.action === 'Excluiu ocorrência' ? 'Cópia completa do registro guardada (pode ser recuperada).' : a.detail;
+    return `<tr><td class="nowrap">${new Date(a.ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' })}</td><td>${esc(a.username)}</td><td>${esc(a.action)}</td><td>${esc(a.target)}</td><td class="small">${esc(d)}</td></tr>`; }).join('') || '<tr><td colspan="5" class="muted">Nenhum registro.</td></tr>'}</tbody></table>`;
+  $('#auditInfo').textContent = `${fmtN(rows.length)} registro(s) · são mostradas as 500 ações mais recentes.`;
+}
+async function changePassword(ev) {
+  ev.preventDefault(); const f = ev.target, err = $('#passErr'); err.classList.add('hidden');
+  if (f.new1.value !== f.new2.value) { err.textContent = 'As duas senhas novas não são iguais.'; err.classList.remove('hidden'); return; }
+  try { await api('/api/password', { method: 'POST', body: { current: f.current.value, new: f.new1.value } }); f.reset(); $('#dlgPass').close(); notify('Senha alterada.'); }
+  catch (e) { err.textContent = e.message; err.classList.remove('hidden'); }
+}
+/* ---------- Padronizar bairro ---------- */
+function fillBairroTool() {
+  const pairs = uniq(S.records.filter(r => r.neighborhood).map(r => r.neighborhood + ' — ' + r.city));
+  $('#bFrom').innerHTML = '<option value="">Escolha o bairro…</option>' + pairs.map(p => `<option>${esc(p)}</option>`).join('');
+}
+async function renameBairro(ev) {
+  ev.preventDefault();
+  const v = $('#bFrom').value, to = $('#bTo').value.trim(); if (!v || !to) return notify('Escolha o bairro e digite o nome correto.', 'error');
+  const i = v.lastIndexOf(' — '), from = v.slice(0, i), city = v.slice(i + 3);
+  if (!confirm(`Trocar "${from}" por "${to}" em todas as ocorrências de ${city}?`)) return;
+  try { const j = await api('/api/bairros/rename', { method: 'POST', body: { city, from, to } }); notify(`${j.changed} ocorrência(s) atualizada(s).`); $('#bTo').value = ''; await loadRecords(); }
+  catch (e) { notify(e.message, 'error'); }
+}
+
 /* ---------- Backup ---------- */
 async function importBackup() {
   const f = $('#bkFile').files[0];
@@ -1380,16 +1500,16 @@ async function doLogin(ev) {
   const btn = $('button[type=submit]', f); btn.disabled = true;
   try {
     const j = await api('/api/login', { method: 'POST', body: { username: f.username.value.trim(), password: f.password.value } });
-    S.admin = true; S.user = j.username; S.csrf = j.csrf;
+    S.admin = true; S.user = j.username; S.csrf = j.csrf; S.role = j.role; S.name = j.name; S.master = !!j.master;
     f.reset(); $('#dlgLogin').close(); renderSession();
     await loadRecords(); await loadDraft();
-    notify('Acesso administrativo liberado.');
+    notify(`Bem-vindo(a), ${S.name || S.user}.`);
   } catch (e) { err.textContent = e.message; err.classList.remove('hidden'); }
   finally { btn.disabled = false; }
 }
 async function doLogout() {
   try { await api('/api/logout', { method: 'POST', body: {} }); } catch (_) {}
-  S.admin = false; S.csrf = null; S.user = null; picking = null; renderSession(); renderReport(); renderProd(); $('#tbl tbody').innerHTML = ''; await loadRecords();
+  S.admin = false; S.csrf = null; S.user = null; S.role = null; S.name = null; S.master = false; picking = null; $('#usersBox').innerHTML = ''; $('#auditBox').innerHTML = ''; renderSession(); renderReport(); renderProd(); $('#tbl tbody').innerHTML = ''; await loadRecords();
 }
 
 /* ---------- Eventos ---------- */
@@ -1398,7 +1518,7 @@ function bind() {
   $('#btnLogout').addEventListener('click', doLogout);
   $('#formLogin').addEventListener('submit', doLogin);
   $$('#tabs button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
-  ['#fFrom', '#fTo', '#fCia', '#fCity', '#fType', '#fCat', '#fInd'].forEach(id => $(id).addEventListener('change', renderDashboard));
+  ['#fFrom', '#fTo', '#fCia', '#fCity', '#fType', '#fCat', '#fInd', '#fGrp'].forEach(id => $(id).addEventListener('change', renderDashboard));
   $$('[data-range]').forEach(b => b.addEventListener('click', () => setRange(b.dataset.range)));
 
   $('#formNovo').addEventListener('submit', saveNovo);
@@ -1419,8 +1539,19 @@ function bind() {
     if (e.target.closest('[data-remove]')) removeRec(tr.dataset.id);
   });
   $('#btnBk').addEventListener('click', importBackup);
-  ['#rKind', '#rRef', '#rFrom', '#rTo', '#rCia', '#rCity', '#rNb', '#rType', '#rInd', '#rCmp', '#rCFrom', '#rCTo', '#rTypes', '#rList'].forEach(id => $(id).addEventListener('change', renderReport));
-  ['#pFrom', '#pTo', '#pType', '#pShow', '#pInd', '#pCmp', '#pCFrom', '#pCTo'].forEach(id => $(id).addEventListener('change', renderProd));
+  $('#formUser').addEventListener('submit', createUser);
+  $('#usersBox').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-u]'); if (!tr) return; const u = tr.dataset.u;
+    if (e.target.closest('[data-ureset]')) { const p = prompt(`Nova senha para ${u} (mínimo 8 caracteres, com letras e números):`); if (p) userAction(u, { password: p }, `Senha de ${u} redefinida.`); }
+    const r = e.target.closest('[data-urole]'); if (r && confirm(`Mudar o perfil de ${u}?`)) userAction(u, { role: r.dataset.urole }, `Perfil de ${u} alterado.`);
+    const a = e.target.closest('[data-uact]'); if (a && confirm(`${a.dataset.uact === '1' ? 'Reativar' : 'Desativar'} o usuário ${u}?`)) userAction(u, { active: a.dataset.uact === '1' }, `Usuário ${u} ${a.dataset.uact === '1' ? 'reativado' : 'desativado'}.`);
+  });
+  $('#auditSearch').addEventListener('input', renderAudit);
+  $('#btnPass').addEventListener('click', () => { $('#passErr').classList.add('hidden'); $('#dlgPass').showModal(); });
+  $('#formPass').addEventListener('submit', changePassword);
+  $('#formBairro').addEventListener('submit', renameBairro);
+  ['#rKind', '#rRef', '#rFrom', '#rTo', '#rCia', '#rCity', '#rNb', '#rType', '#rInd', '#rGrp', '#rCmp', '#rCFrom', '#rCTo', '#rTypes', '#rList'].forEach(id => $(id).addEventListener('change', renderReport));
+  ['#pFrom', '#pTo', '#pType', '#pShow', '#pInd', '#pGrp', '#pCmp', '#pCFrom', '#pCTo'].forEach(id => $(id).addEventListener('change', renderProd));
   $('#pInds').addEventListener('change', e => { if (e.target.checked) indOff.p.delete(e.target.value); else indOff.p.add(e.target.value); renderProd(); });
   $('#rInds').addEventListener('change', e => { if (e.target.checked) indOff.r.delete(e.target.value); else indOff.r.add(e.target.value); renderReport(); });
   $('#rInd').innerHTML = INDSEL; $('#pInd').innerHTML = INDSEL;

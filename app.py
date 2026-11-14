@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
 from werkzeug.exceptions import HTTPException
-from core import validate_record, record_from_row, pdf_preview, COUNT_FIELDS
+from core import validate_record, record_from_row, pdf_preview, COUNT_FIELDS, norm_bairro, bairro_key, canon_bairros
 
 HERE = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=None)
@@ -73,14 +73,21 @@ def _initialize_once():
           conducoes INTEGER NOT NULL DEFAULT 0, flagrantes INTEGER NOT NULL DEFAULT 0,
           tco INTEGER NOT NULL DEFAULT 0, mandados INTEGER NOT NULL DEFAULT 0, veiculos INTEGER NOT NULL DEFAULT 0,
           armas_brancas INTEGER NOT NULL DEFAULT 0, simulacros INTEGER NOT NULL DEFAULT 0, adolescentes INTEGER NOT NULL DEFAULT 0,
+          conduzidos INTEGER NOT NULL DEFAULT 0, presos INTEGER NOT NULL DEFAULT 0, grupo TEXT NOT NULL DEFAULT '',
+          created_by TEXT NOT NULL DEFAULT '', updated_by TEXT NOT NULL DEFAULT '',
           drugs TEXT NOT NULL DEFAULT '[]', guns TEXT NOT NULL DEFAULT '[]', notes TEXT NOT NULL DEFAULT '',
           source TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         )'''))
         cols={x[0] for x in c.execute(text("SELECT * FROM records WHERE 1=0")).cursor.description}
         for col in ('lat','lon'):
             if col not in cols:c.execute(text(f'ALTER TABLE records ADD COLUMN {col} DOUBLE PRECISION'))
-        for col in ('armas_brancas','simulacros','adolescentes'):
+        for col in ('grupo','created_by','updated_by'):
+            if col not in cols:c.execute(text(f"ALTER TABLE records ADD COLUMN {col} TEXT NOT NULL DEFAULT ''"))
+        for col in ('armas_brancas','simulacros','adolescentes','conduzidos','presos'):
             if col not in cols:c.execute(text(f'ALTER TABLE records ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0'))
+        if 'conduzidos' not in cols:  # ocorrências antigas: ao menos 1 pessoa por condução/flagrante registrado
+            c.execute(text('UPDATE records SET conduzidos=conducoes WHERE conduzidos=0 AND conducoes>0'))
+            c.execute(text('UPDATE records SET presos=flagrantes WHERE presos=0 AND flagrantes>0'))
         c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS records_identify ON records(date, ref) WHERE ref != ''"))
         c.execute(text('''CREATE TABLE IF NOT EXISTS sessions (
           token_hash TEXT PRIMARY KEY, username TEXT NOT NULL,
@@ -94,6 +101,15 @@ def _initialize_once():
           lat DOUBLE PRECISION NOT NULL, lon DOUBLE PRECISION NOT NULL,
           PRIMARY KEY(city, neighborhood)
         )'''))
+        c.execute(text('''CREATE TABLE IF NOT EXISTS users (
+          username TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', password_hash TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'operador', active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+        )'''))
+        c.execute(text('''CREATE TABLE IF NOT EXISTS audit (
+          id TEXT PRIMARY KEY, ts TEXT NOT NULL, username TEXT NOT NULL, action TEXT NOT NULL,
+          target TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT ''
+        )'''))
+        c.execute(text('CREATE INDEX IF NOT EXISTS audit_ts ON audit(ts)'))
         c.execute(text('''CREATE TABLE IF NOT EXISTS login_limits (
           key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, window_started BIGINT NOT NULL
         )'''))
@@ -110,10 +126,26 @@ def get_records(private=False):
     initialize()
     with database().connect() as c:
         rows = c.execute(text('SELECT * FROM records ORDER BY date DESC,time DESC,created_at DESC')).fetchall()
-    return [record_from_row(dict(x._mapping),private) for x in rows]
+    recs=[record_from_row(dict(x._mapping),private) for x in rows]
+    canon=canon_bairros((r['city'],r['neighborhood']) for r in recs)   # mesma grafia para o mesmo bairro
+    for r in recs:
+        if r['neighborhood']:r['neighborhood']=canon.get(bairro_key(r['city'],r['neighborhood']),r['neighborhood'])
+    return recs
 
 
-def insert_records(records):
+def now_iso():return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def log(c,user,action,target='',detail=''):
+    # Registro de auditoria: quem fez o quê e quando.
+    c.execute(text('INSERT INTO audit(id,ts,username,action,target,detail) VALUES(:id,:ts,:u,:a,:t,:d)'),
+              {'id':secrets.token_urlsafe(12),'ts':now_iso(),'u':user,'a':action,'t':str(target)[:200],'d':str(detail)[:20000]})
+
+
+def rec_label(r):return f"nº {r.get('ref') or 's/n'} de {'/'.join(reversed(str(r.get('date','')).split('-')))} ({str(r.get('kind') or 'sem tipo')[:60]})"
+
+
+def insert_records(records,user=''):
     if not isinstance(records,list) or not 1 <= len(records) <= 200:
         raise ValueError('Envie entre 1 e 200 registros por lote.')
     valid=[validate_record(x) for x in records]
@@ -125,38 +157,69 @@ def insert_records(records):
             if r['ref'] and c.execute(text('SELECT id FROM records WHERE date=:d AND ref=:r'),{'d':r['date'],'r':r['ref']}).fetchone():
                 skipped.append(r['ref']); continue
             uid=secrets.token_urlsafe(16)
-            params={**r,'id':uid,'created_at':now,'updated_at':now,'drugs':json.dumps(r['drugs'],ensure_ascii=False),'guns':json.dumps(r['guns'],ensure_ascii=False)}
+            params={**r,'id':uid,'created_at':now,'updated_at':now,'created_by':user,'updated_by':user,'drugs':json.dumps(r['drugs'],ensure_ascii=False),'guns':json.dumps(r['guns'],ensure_ascii=False)}
             c.execute(text('''INSERT INTO records(id,date,time,cia,city,neighborhood,location,ref,kind,crime_category,
-               conducoes,flagrantes,tco,mandados,veiculos,armas_brancas,simulacros,adolescentes,drugs,guns,notes,source,lat,lon,created_at,updated_at)
+               conducoes,flagrantes,tco,mandados,veiculos,armas_brancas,simulacros,adolescentes,conduzidos,presos,grupo,drugs,guns,notes,source,lat,lon,created_by,updated_by,created_at,updated_at)
                VALUES(:id,:date,:time,:cia,:city,:neighborhood,:location,:ref,:kind,:crime_category,
-               :conducoes,:flagrantes,:tco,:mandados,:veiculos,:armas_brancas,:simulacros,:adolescentes,:drugs,:guns,:notes,:source,:lat,:lon,:created_at,:updated_at)'''),params)
+               :conducoes,:flagrantes,:tco,:mandados,:veiculos,:armas_brancas,:simulacros,:adolescentes,:conduzidos,:presos,:grupo,:drugs,:guns,:notes,:source,:lat,:lon,:created_by,:updated_by,:created_at,:updated_at)'''),params)
+            log(c,user,'Cadastrou ocorrência',rec_label(r),r.get('source',''))
             inserted.append(uid)
     return {'inserted':len(inserted),'skipped':len(skipped),'skipped_refs':skipped}
 
 
-def password_ok(candidate):
+def verify_hash(stored,candidate):
     try:
-        algo,iterations,salt,digest=ADMIN_PASSWORD_HASH.split('$',3)
+        algo,iterations,salt,digest=str(stored).split('$',3)
         if algo!='pbkdf2_sha256' or not (200_000<=int(iterations)<=2_000_000): return False
         got=hashlib.pbkdf2_hmac('sha256',candidate.encode(),bytes.fromhex(salt),int(iterations)).hex()
         return hmac.compare_digest(got,digest)
     except (ValueError,UnicodeError,TypeError): return False
 
 
+def make_hash(password):
+    salt=secrets.token_hex(16);rounds=600_000
+    return f"pbkdf2_sha256${rounds}${salt}${hashlib.pbkdf2_hmac('sha256',password.encode(),bytes.fromhex(salt),rounds).hex()}"
+
+
+def check_new_password(p):
+    p=str(p or '')
+    if len(p)<8 or len(p)>200:raise ValueError('A senha deve ter pelo menos 8 caracteres.')
+    if p.isdigit() or p.lower() in ('password','senha123','12345678','123456789','qwertyui'):raise ValueError('Senha muito fraca: misture letras e números.')
+    return p
+
+
+def account(username):
+    """Perfil do usuário: o administrador principal vem das variáveis da Vercel; os demais, da tabela users."""
+    if ADMIN_USERNAME and hmac.compare_digest(str(username),ADMIN_USERNAME):
+        return {'username':ADMIN_USERNAME,'name':'Administrador principal','role':'admin','master':True}
+    row=query_one('SELECT username,name,role FROM users WHERE username=:u AND active=1',{'u':username})
+    return {**row,'master':False} if row else None
+
+
 def session():
+    """Sessão de quem está logado (qualquer perfil). Conta desativada perde o acesso na hora."""
     token = request.cookies.get('sess','')
     if not token or len(token)>200:return None
     digest=hashlib.sha256(token.encode()).hexdigest()
     row=query_one('SELECT username,csrf,expires FROM sessions WHERE token_hash=:hash',{'hash':digest})
-    return row if row and int(row['expires'])>int(time.time()) else None
+    if not row or int(row['expires'])<=int(time.time()):return None
+    acc=account(row['username'])
+    return {**row,**acc} if acc else None
 
 
 def admin():
+    """Usuário logado + token CSRF (necessário para qualquer alteração)."""
     s=session()
     if not s:return None
     check=request.headers.get('X-CSRF-Token','')
     if not check or not hmac.compare_digest(check,str(s['csrf'])): return None
     return s
+
+
+def boss():
+    """Somente perfil Administrador (usuários, auditoria, exclusão)."""
+    s=admin()
+    return s if s and s['role']=='admin' else None
 
 
 def json_body():
@@ -226,7 +289,8 @@ def internal(err):
 @app.get('/api/session')
 def api_session():
     s=session()
-    return jsonify({'admin':bool(s),'username':s['username'] if s else None,'csrf':s['csrf'] if s else None})
+    return jsonify({'admin':bool(s),'username':s['username'] if s else None,'csrf':s['csrf'] if s else None,
+                    'role':s['role'] if s else None,'name':s['name'] if s else None,'master':bool(s and s['master'])})
 
 
 @app.get('/api/records')
@@ -259,11 +323,17 @@ def api_geo_resolve():
 
 @app.get('/api/geo')
 def api_geo():
-    # Posição (lat/lon) de cada bairro para o mapa de calor. Não contém dados de ocorrências.
+    # Posição (lat/lon) de cada bairro para o mapa. Não contém dados de ocorrências.
     initialize()
     with database().connect() as c:
         rows=c.execute(text('SELECT city,neighborhood,lat,lon FROM geo')).fetchall()
-    return jsonify({'places':[dict(x._mapping) for x in rows]})
+        used=c.execute(text("SELECT DISTINCT city,neighborhood FROM records WHERE neighborhood!=''")).fetchall()
+    canon=canon_bairros((x[0],x[1]) for x in used)
+    out={}
+    for x in rows:
+        d=dict(x._mapping);k=bairro_key(d['city'],d['neighborhood'])
+        d['neighborhood']=canon.get(k,norm_bairro(d['neighborhood']));out[k]=d
+    return jsonify({'places':list(out.values())})
 
 
 @app.post('/api/geo')
@@ -275,7 +345,7 @@ def api_geo_save():
     ok=[]
     for p in places:
         if not isinstance(p,dict):raise ValueError('Local inválido.')
-        city=str(p.get('city') or '').strip();nb=str(p.get('neighborhood') or '').strip()
+        city=str(p.get('city') or '').strip();nb=norm_bairro(p.get('neighborhood'))
         try:lat=float(p.get('lat'));lon=float(p.get('lon'))
         except (TypeError,ValueError):raise ValueError('Coordenadas inválidas.')
         if not nb or len(city)>100 or len(nb)>100 or not (-90<=lat<=90 and -180<=lon<=180):raise ValueError('Local inválido.')
@@ -327,9 +397,15 @@ def api_login():
     if login_attempts(key)>=7:return no_access('Muitas tentativas. Tente novamente em 15 minutos.',429)
     data=json_body()
     if not isinstance(data,dict):raise ValueError('Credenciais inválidas.')
-    username=str(data.get('username',''))[:80]
+    username=str(data.get('username','')).strip()[:80]
     password=str(data.get('password',''))[:300]
-    if hmac.compare_digest(username,ADMIN_USERNAME) and password_ok(password):
+    if hmac.compare_digest(username,ADMIN_USERNAME):
+        ok=verify_hash(ADMIN_PASSWORD_HASH,password)
+    else:
+        row=query_one('SELECT password_hash FROM users WHERE username=:u AND active=1',{'u':username})
+        ok=verify_hash(row['password_hash'] if row else ADMIN_PASSWORD_HASH,password) and bool(row)
+    if ok:
+        acc=account(username)
         token=secrets.token_urlsafe(40)
         csrf=secrets.token_urlsafe(32)
         exp=int(time.time())+SESSION_SECONDS
@@ -338,11 +414,122 @@ def api_login():
             c.execute(text('DELETE FROM sessions WHERE expires<:now'),{'now':int(time.time())})
             c.execute(text('INSERT INTO sessions(token_hash,username,csrf,expires) VALUES(:hash,:u,:csrf,:exp)'),
                       {'hash':hashlib.sha256(token.encode()).hexdigest(),'u':username,'csrf':csrf,'exp':exp})
-        resp=jsonify({'admin':True,'username':username,'csrf':csrf})
+            log(c,username,'Entrou no sistema')
+        resp=jsonify({'admin':True,'username':username,'csrf':csrf,'role':acc['role'],'name':acc['name'],'master':acc['master']})
         resp.set_cookie('sess',token,max_age=SESSION_SECONDS,secure=bool(os.environ.get('VERCEL') or os.environ.get('APP_SECURE_COOKIES')=='1'),httponly=True,samesite='Strict',path='/')
         return resp
     register_failed_login(key)
     return no_access('Usuário ou senha incorretos.',401)
+
+
+# ---------- Usuários (somente perfil Administrador) ----------
+ROLES=('admin','operador')
+
+
+@app.get('/api/users')
+def api_users():
+    s=session()
+    if not s or s['role']!='admin':return no_access('Somente administradores.',403)
+    with database().connect() as c:
+        rows=c.execute(text('SELECT username,name,role,active,created_at FROM users ORDER BY username')).fetchall()
+    return jsonify({'users':[{'username':ADMIN_USERNAME,'name':'Administrador principal','role':'admin','active':1,'master':True}]+[dict(x._mapping) for x in rows]})
+
+
+@app.post('/api/users')
+def api_user_create():
+    s=boss()
+    if not s:return no_access('Somente administradores.',403)
+    d=json_body()
+    if not isinstance(d,dict):raise ValueError('Dados inválidos.')
+    u=str(d.get('username','')).strip();name=str(d.get('name','')).strip()[:80];role=str(d.get('role','operador'))
+    if not re.fullmatch(r'[A-Za-z0-9._-]{3,40}',u):raise ValueError('Usuário: use de 3 a 40 letras, números, ponto, hífen ou sublinhado (sem espaços).')
+    if hmac.compare_digest(u,ADMIN_USERNAME):raise ValueError('Esse usuário já existe.')
+    if role not in ROLES:raise ValueError('Perfil inválido.')
+    if not name:raise ValueError('Informe o nome da pessoa.')
+    pw=check_new_password(d.get('password'))
+    with database().begin() as c:
+        if c.execute(text('SELECT 1 FROM users WHERE username=:u'),{'u':u}).fetchone():raise ValueError('Esse usuário já existe.')
+        c.execute(text('INSERT INTO users(username,name,password_hash,role,active,created_at) VALUES(:u,:n,:h,:r,1,:t)'),{'u':u,'n':name,'h':make_hash(pw),'r':role,'t':now_iso()})
+        log(c,s['username'],'Criou usuário',u,f'{name} · perfil {role}')
+    return jsonify({'ok':True}),201
+
+
+@app.put('/api/users/<username>')
+def api_user_update(username):
+    s=boss()
+    if not s:return no_access('Somente administradores.',403)
+    d=json_body()
+    if not isinstance(d,dict):raise ValueError('Dados inválidos.')
+    if hmac.compare_digest(username,ADMIN_USERNAME):raise ValueError('O administrador principal é configurado na Vercel e não pode ser alterado aqui.')
+    with database().begin() as c:
+        row=c.execute(text('SELECT name,role,active FROM users WHERE username=:u'),{'u':username}).fetchone()
+        if not row:return no_access('Usuário não encontrado.',404)
+        changes=[]
+        if 'name' in d:
+            name=str(d['name']).strip()[:80]
+            if not name:raise ValueError('Informe o nome da pessoa.')
+            c.execute(text('UPDATE users SET name=:n WHERE username=:u'),{'n':name,'u':username});changes.append(f'nome: {name}')
+        if 'role' in d:
+            if d['role'] not in ROLES:raise ValueError('Perfil inválido.')
+            c.execute(text('UPDATE users SET role=:r WHERE username=:u'),{'r':d['role'],'u':username});changes.append(f"perfil: {d['role']}")
+        if 'active' in d:
+            act=1 if d['active'] else 0
+            c.execute(text('UPDATE users SET active=:a WHERE username=:u'),{'a':act,'u':username});changes.append('reativado' if act else 'desativado')
+            if not act:c.execute(text('DELETE FROM sessions WHERE username=:u'),{'u':username})
+        if d.get('password'):
+            c.execute(text('UPDATE users SET password_hash=:h WHERE username=:u'),{'h':make_hash(check_new_password(d['password'])),'u':username})
+            c.execute(text('DELETE FROM sessions WHERE username=:u'),{'u':username});changes.append('senha redefinida')
+        log(c,s['username'],'Alterou usuário',username,'; '.join(changes))
+    return jsonify({'ok':True})
+
+
+@app.post('/api/password')
+def api_password():
+    s=admin()
+    if not s:return no_access()
+    if s['master']:raise ValueError('A senha do administrador principal fica nas configurações da Vercel (ADMIN_PASSWORD_HASH) e não pode ser trocada por aqui.')
+    d=json_body()
+    if not isinstance(d,dict):raise ValueError('Dados inválidos.')
+    row=query_one('SELECT password_hash FROM users WHERE username=:u',{'u':s['username']})
+    if not row or not verify_hash(row['password_hash'],str(d.get('current',''))):raise ValueError('Senha atual incorreta.')
+    pw=check_new_password(d.get('new'))
+    with database().begin() as c:
+        c.execute(text('UPDATE users SET password_hash=:h WHERE username=:u'),{'h':make_hash(pw),'u':s['username']})
+        log(c,s['username'],'Trocou a própria senha')
+    return jsonify({'ok':True})
+
+
+@app.get('/api/audit')
+def api_audit():
+    s=session()
+    if not s or s['role']!='admin':return no_access('Somente administradores.',403)
+    with database().connect() as c:
+        rows=c.execute(text('SELECT ts,username,action,target,detail FROM audit ORDER BY ts DESC LIMIT 500')).fetchall()
+    return jsonify({'entries':[dict(x._mapping) for x in rows]})
+
+
+@app.post('/api/bairros/rename')
+def api_bairro_rename():
+    # Junta um bairro escrito de outro jeito (ex.: "Seriema I" -> "Siriema I") em todas as ocorrências da cidade.
+    s=admin()
+    if not s:return no_access()
+    d=json_body()
+    if not isinstance(d,dict):raise ValueError('Dados inválidos.')
+    city=str(d.get('city','')).strip();old=norm_bairro(d.get('from'));new=norm_bairro(d.get('to'))
+    if not old or not new or len(new)>100:raise ValueError('Informe o bairro atual e o nome correto.')
+    ko,kn=bairro_key(city,old),bairro_key(city,new)
+    n=0
+    with database().begin() as c:
+        for rid,nb in c.execute(text('SELECT id,neighborhood FROM records WHERE city=:c'),{'c':city}).fetchall():
+            if bairro_key(city,nb) in (ko,kn) and nb!=new:
+                c.execute(text('UPDATE records SET neighborhood=:n,updated_at=:t,updated_by=:u WHERE id=:id'),{'n':new,'t':now_iso(),'u':s['username'],'id':rid});n+=1
+        geo={bairro_key(city,g[0]):g for g in c.execute(text('SELECT neighborhood,lat,lon FROM geo WHERE city=:c'),{'c':city}).fetchall()}
+        keep=geo.get(kn) or geo.get(ko)
+        for k,g in geo.items():
+            if k in (ko,kn):c.execute(text('DELETE FROM geo WHERE city=:c AND neighborhood=:n'),{'c':city,'n':g[0]})
+        if keep:c.execute(text('INSERT INTO geo(city,neighborhood,lat,lon) VALUES(:c,:n,:la,:lo)'),{'c':city,'n':new,'la':keep[1],'lo':keep[2]})
+        log(c,s['username'],'Renomeou bairro',f'{old} → {new} ({city})',f'{n} ocorrência(s) alterada(s)')
+    return jsonify({'ok':True,'changed':n})
 
 
 @app.post('/api/logout')
@@ -369,16 +556,18 @@ def api_pdf_preview():
 
 @app.post('/api/records')
 def api_record_create():
-    if not admin():return no_access()
-    return jsonify(insert_records([json_body()])),201
+    s=admin()
+    if not s:return no_access()
+    return jsonify(insert_records([json_body()],s['username'])),201
 
 
 @app.post('/api/records/import')
 def api_records_import():
-    if not admin():return no_access()
+    s=admin()
+    if not s:return no_access()
     body=json_body()
     if not isinstance(body,dict):raise ValueError('Requisição inválida.')
-    return jsonify(insert_records(body.get('records',[])))
+    return jsonify(insert_records(body.get('records',[]),s['username']))
 
 
 @app.post('/api/draft')
@@ -401,27 +590,43 @@ def api_draft_clear():
     return jsonify({'ok':True})
 
 
+FIELD_NAMES={'date':'data','time':'hora','cia':'CIA','city':'cidade','neighborhood':'bairro','location':'endereço','ref':'número','kind':'tipo',
+  'crime_category':'classificação','grupo':'grupo','conducoes':'conduções','flagrantes':'flagrantes','tco':'TCO','mandados':'mandados','veiculos':'veículos',
+  'armas_brancas':'armas brancas','simulacros':'simulacros','adolescentes':'adolescentes','conduzidos':'pessoas conduzidas','presos':'pessoas presas',
+  'drugs':'drogas','guns':'armas de fogo','notes':'observações','source':'origem','lat':'latitude','lon':'longitude'}
+
+
 @app.put('/api/records/<uid>')
 def api_record_edit(uid):
-    if not admin():return no_access()
+    s=admin()
+    if not s:return no_access()
     if not re.fullmatch(r'[a-zA-Z0-9_-]{8,100}',uid):return no_access('Ocorrência inválida.',400)
     r=validate_record(json_body())
-    r={**r,'drugs':json.dumps(r['drugs'],ensure_ascii=False),'guns':json.dumps(r['guns'],ensure_ascii=False),'updated_at':dt.datetime.now(dt.timezone.utc).isoformat(),'id':uid}
+    r={**r,'drugs':json.dumps(r['drugs'],ensure_ascii=False),'guns':json.dumps(r['guns'],ensure_ascii=False),'updated_at':now_iso(),'updated_by':s['username'],'id':uid}
     with database().begin() as c:
-        result=c.execute(text('''UPDATE records SET date=:date,time=:time,cia=:cia,city=:city,
+        old=c.execute(text('SELECT * FROM records WHERE id=:id'),{'id':uid}).fetchone()
+        if not old:return no_access('Ocorrência não encontrada.',404)
+        old=dict(old._mapping)
+        diff=[f"{FIELD_NAMES[k]}: {old.get(k) if old.get(k) not in (None,'') else '(vazio)'} → {r[k] if r[k] not in (None,'') else '(vazio)'}" for k in FIELD_NAMES if str(old.get(k) if old.get(k) is not None else '')!=str(r[k] if r[k] is not None else '')]
+        c.execute(text('''UPDATE records SET date=:date,time=:time,cia=:cia,city=:city,
           neighborhood=:neighborhood,location=:location,ref=:ref,kind=:kind,crime_category=:crime_category,
           conducoes=:conducoes,flagrantes=:flagrantes,tco=:tco,mandados=:mandados,veiculos=:veiculos,
-          armas_brancas=:armas_brancas,simulacros=:simulacros,adolescentes=:adolescentes,
-          drugs=:drugs,guns=:guns,notes=:notes,source=:source,lat=:lat,lon=:lon,updated_at=:updated_at WHERE id=:id'''),r)
-    if result.rowcount!=1:return no_access('Ocorrência não encontrada.',404)
+          armas_brancas=:armas_brancas,simulacros=:simulacros,adolescentes=:adolescentes,conduzidos=:conduzidos,presos=:presos,grupo=:grupo,
+          drugs=:drugs,guns=:guns,notes=:notes,source=:source,lat=:lat,lon=:lon,updated_at=:updated_at,updated_by=:updated_by WHERE id=:id'''),r)
+        log(c,s['username'],'Editou ocorrência',rec_label(r),'; '.join(diff) or 'sem alterações')
     return jsonify({'ok':True})
 
 
 @app.delete('/api/records/<uid>')
 def api_record_delete(uid):
-    if not admin():return no_access()
+    s=boss()
+    if not s:return no_access('Somente administradores podem excluir ocorrências.',403)
     if not re.fullmatch(r'[a-zA-Z0-9_-]{8,100}',uid):return no_access('Ocorrência inválida.',400)
-    with database().begin() as c:result=c.execute(text('DELETE FROM records WHERE id=:id'),{'id':uid})
+    with database().begin() as c:
+        old=c.execute(text('SELECT * FROM records WHERE id=:id'),{'id':uid}).fetchone()
+        result=c.execute(text('DELETE FROM records WHERE id=:id'),{'id':uid})
+        if old:  # guarda a cópia completa do registro excluído, para poder recuperar
+            log(c,s['username'],'Excluiu ocorrência',rec_label(dict(old._mapping)),json.dumps(dict(old._mapping),ensure_ascii=False,default=str))
     return jsonify({'ok':True,'deleted':result.rowcount})
 
 
