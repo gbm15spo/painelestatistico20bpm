@@ -51,8 +51,20 @@ def database():
 
 
 def initialize():
+    # Duas instâncias podem iniciar ao mesmo tempo e disputar a criação/atualização das tabelas: tenta de novo.
     global _init_done
     if _init_done: return
+    from sqlalchemy.exc import DBAPIError
+    for attempt in range(4):
+        try:
+            _initialize_once(); break
+        except DBAPIError:
+            if attempt == 3: raise
+            time.sleep(0.4 * (attempt + 1))
+    _init_done = True
+
+
+def _initialize_once():
     with database().begin() as c:
         c.execute(text('''CREATE TABLE IF NOT EXISTS records (
           id TEXT PRIMARY KEY, date TEXT NOT NULL, time TEXT NOT NULL DEFAULT '',
@@ -60,12 +72,15 @@ def initialize():
           ref TEXT NOT NULL DEFAULT '', kind TEXT NOT NULL DEFAULT '', crime_category TEXT NOT NULL DEFAULT 'outros',
           conducoes INTEGER NOT NULL DEFAULT 0, flagrantes INTEGER NOT NULL DEFAULT 0,
           tco INTEGER NOT NULL DEFAULT 0, mandados INTEGER NOT NULL DEFAULT 0, veiculos INTEGER NOT NULL DEFAULT 0,
+          armas_brancas INTEGER NOT NULL DEFAULT 0, simulacros INTEGER NOT NULL DEFAULT 0, adolescentes INTEGER NOT NULL DEFAULT 0,
           drugs TEXT NOT NULL DEFAULT '[]', guns TEXT NOT NULL DEFAULT '[]', notes TEXT NOT NULL DEFAULT '',
           source TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
         )'''))
         cols={x[0] for x in c.execute(text("SELECT * FROM records WHERE 1=0")).cursor.description}
         for col in ('lat','lon'):
             if col not in cols:c.execute(text(f'ALTER TABLE records ADD COLUMN {col} DOUBLE PRECISION'))
+        for col in ('armas_brancas','simulacros','adolescentes'):
+            if col not in cols:c.execute(text(f'ALTER TABLE records ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0'))
         c.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS records_identify ON records(date, ref) WHERE ref != ''"))
         c.execute(text('''CREATE TABLE IF NOT EXISTS sessions (
           token_hash TEXT PRIMARY KEY, username TEXT NOT NULL,
@@ -82,7 +97,6 @@ def initialize():
         c.execute(text('''CREATE TABLE IF NOT EXISTS login_limits (
           key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, window_started BIGINT NOT NULL
         )'''))
-    _init_done = True
 
 
 def query_one(sql, params=None):
@@ -113,9 +127,9 @@ def insert_records(records):
             uid=secrets.token_urlsafe(16)
             params={**r,'id':uid,'created_at':now,'updated_at':now,'drugs':json.dumps(r['drugs'],ensure_ascii=False),'guns':json.dumps(r['guns'],ensure_ascii=False)}
             c.execute(text('''INSERT INTO records(id,date,time,cia,city,neighborhood,location,ref,kind,crime_category,
-               conducoes,flagrantes,tco,mandados,veiculos,drugs,guns,notes,source,lat,lon,created_at,updated_at)
+               conducoes,flagrantes,tco,mandados,veiculos,armas_brancas,simulacros,adolescentes,drugs,guns,notes,source,lat,lon,created_at,updated_at)
                VALUES(:id,:date,:time,:cia,:city,:neighborhood,:location,:ref,:kind,:crime_category,
-               :conducoes,:flagrantes,:tco,:mandados,:veiculos,:drugs,:guns,:notes,:source,:lat,:lon,:created_at,:updated_at)'''),params)
+               :conducoes,:flagrantes,:tco,:mandados,:veiculos,:armas_brancas,:simulacros,:adolescentes,:drugs,:guns,:notes,:source,:lat,:lon,:created_at,:updated_at)'''),params)
             inserted.append(uid)
     return {'inserted':len(inserted),'skipped':len(skipped),'skipped_refs':skipped}
 
@@ -397,6 +411,7 @@ def api_record_edit(uid):
         result=c.execute(text('''UPDATE records SET date=:date,time=:time,cia=:cia,city=:city,
           neighborhood=:neighborhood,location=:location,ref=:ref,kind=:kind,crime_category=:crime_category,
           conducoes=:conducoes,flagrantes=:flagrantes,tco=:tco,mandados=:mandados,veiculos=:veiculos,
+          armas_brancas=:armas_brancas,simulacros=:simulacros,adolescentes=:adolescentes,
           drugs=:drugs,guns=:guns,notes=:notes,source=:source,lat=:lat,lon=:lon,updated_at=:updated_at WHERE id=:id'''),r)
     if result.rowcount!=1:return no_access('Ocorrência não encontrada.',404)
     return jsonify({'ok':True})

@@ -166,7 +166,7 @@ td.n{text-align:center;font-variant-numeric:tabular-nums}
 /* editor */
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
 .grid .wide{grid-column:span 2}
-.grid.ind{grid-template-columns:repeat(5,minmax(0,1fr))}
+.grid.ind{grid-template-columns:repeat(4,minmax(0,1fr))}
 .geo-row{display:flex;gap:6px;align-items:center}
 .geo-row .btn{white-space:nowrap}
 .geo-msg{font-weight:600;min-height:1em}.geo-msg.good{color:var(--ok)}.geo-msg.bad{color:var(--err)}
@@ -302,7 +302,7 @@ dialog h2{margin-bottom:14px}
       <label>CIA<select id="fCia"><option value="">Todas</option></select></label>
       <label>Cidade<select id="fCity"><option value="">Todas</option></select></label>
       <label>Tipo de ocorrência<select id="fType"><option value="">Todos</option></select></label>
-      <label>Indicador<select id="fInd"><option value="">Todos</option><option value="conducoes">Conduções</option><option value="flagrantes">Flagrantes</option><option value="tco">TCO</option><option value="mandados">Mandados</option><option value="veiculos">Veículos recuperados</option><option value="armas">Armas apreendidas</option><option value="drogas">Ocorrências com drogas</option><option value="homicidios">Homicídios</option><option value="tentativas">Tentativas de homicídio</option><option value="outras">Outras ocorrências</option></select></label>
+      <label>Indicador<select id="fInd"><option value="">Todos</option><option value="conducoes">Conduções</option><option value="flagrantes">Flagrantes</option><option value="tco">TCO</option><option value="mandados">Mandados</option><option value="veiculos">Veículos recuperados</option><option value="armas">Armas de fogo apreendidas</option><option value="drogas">Ocorrências com drogas</option><option value="homicidios">Homicídios</option><option value="tentativas">Tentativas de homicídio</option><option value="armas_brancas">Armas brancas apreendidas</option><option value="simulacros">Simulacros apreendidos</option><option value="adolescentes">Adolescentes apreendidos</option><option value="outras">Outras ocorrências</option></select></label>
       <label>Classificação<select id="fCat">
         <option value="">Todas</option>
         <option value="homicidio">Homicídio</option>
@@ -327,7 +327,7 @@ dialog h2{margin-bottom:14px}
       <div class="card"><h2>Naturezas mais frequentes</h2><div id="chKind" class="hbars"></div></div>
       <div class="card span2"><h2>Mapa de ocorrências por bairro</h2><p class="muted small">Cada cor é um indicador e o número é a quantidade no bairro; em cinza, as demais ocorrências. Clique (ou toque) num círculo para ver os tipos de ocorrência dali.</p><div id="map"></div><div id="mapLegend" class="map-legend"></div><div id="mapInfo" class="small"></div></div>
       <div class="card"><h2>Drogas apreendidas</h2><div id="tbDrugs"></div></div>
-      <div class="card"><h2>Armas apreendidas</h2><div id="tbGuns"></div></div>
+      <div class="card"><h2>Armas de fogo apreendidas</h2><div id="tbGuns"></div></div>
     </div>
   </section>
 
@@ -347,7 +347,7 @@ dialog h2{margin-bottom:14px}
   <section id="tab-pdf" class="tab">
     <div class="card">
       <h2>Importar relatório em PDF</h2>
-      <p class="muted">O sistema lê o relatório padrão (“TIPO(S) … Nº DA OCORRÊNCIA”) e mostra uma prévia. <strong>Nada é gravado</strong> até você revisar e confirmar.</p>
+      <p class="muted">O sistema lê o relatório padrão (“TIPO(S) … Nº DA OCORRÊNCIA”) e procura os indicadores no TIPO e nas MEDIDAS ADOTADAS PELA GUARNIÇÃO de cada ocorrência, mostrando uma prévia. <strong>Nada é gravado</strong> até você revisar e confirmar.</p>
       <div class="row-inline">
         <input type="file" id="pdfFile" accept="application/pdf,.pdf">
         <button type="button" id="btnPdf" class="btn primary">Ler PDF</button>
@@ -371,7 +371,7 @@ dialog h2{margin-bottom:14px}
       </div>
       <div class="table-wrap"><table id="tbl"><thead><tr>
         <th>Data</th><th>Hora</th><th>Nº</th><th>Natureza</th><th>Classif.</th><th>CIA</th><th>Cidade</th><th>Bairro</th>
-        <th title="Conduções">Cond.</th><th title="Flagrantes">Flag.</th><th>TCO</th><th title="Mandados">Mand.</th><th title="Veículos recuperados">Veíc.</th><th>Apreensões</th><th></th>
+        <th title="Conduções">Cond.</th><th title="Flagrantes">Flag.</th><th>TCO</th><th title="Mandados">Mand.</th><th title="Veículos recuperados">Veíc.</th><th title="Armas brancas apreendidas">A. br.</th><th title="Simulacros apreendidos">Simul.</th><th title="Adolescentes apreendidos">Adol.</th><th>Apreensões</th><th></th>
       </tr></thead><tbody></tbody></table></div>
       <p id="tblInfo" class="muted small"></p>
     </div>
@@ -508,7 +508,9 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const S = { admin: false, csrf: null, user: null, records: [], pdf: [], geo: {}, kinds: new Map() };
 const CATS = { outros: 'Outros', homicidio: 'Homicídio', tentativa_homicidio: 'Tentativa de homicídio' };
-const IND = [['conducoes','Conduções'],['flagrantes','Flagrantes'],['tco','TCO'],['mandados','Mandados'],['veiculos','Veículos recuperados']];
+const IND = [['conducoes','Conduções'],['flagrantes','Flagrantes'],['tco','TCO'],['mandados','Mandados'],['veiculos','Veículos recuperados'],['armas_brancas','Armas brancas apreendidas'],['simulacros','Simulacros apreendidos'],['adolescentes','Adolescentes apreendidos']];
+const IND_SHORT = { conducoes: 'Cond.', flagrantes: 'Flag.', tco: 'TCO', mandados: 'Mand.', veiculos: 'Veíc.', armas_brancas: 'A. br.', simulacros: 'Simul.', adolescentes: 'Adol.' };
+const indHead = () => IND.map(([k, l]) => `<th class="n" title="${l}">${IND_SHORT[k]}</th>`).join('');
 const UNITS = ['g','kg','porções','unidades','comprimidos','ml','L','pés'];
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 
@@ -636,7 +638,7 @@ function renderDashboard() {
     ? `${fmtN(rs.length)} ocorrência(s) · de ${fmtD(dates[0])} a ${fmtD(dates[dates.length - 1])}` : '';
   $('#empty').classList.toggle('hidden', rs.length > 0);
 
-  const k = [['Ocorrências', rs.length], ...IND.map(([f, l]) => [l, sum(f)]), ['Armas apreendidas', armas],
+  const k = [['Ocorrências', rs.length], ...IND.map(([f, l]) => [l, sum(f)]), ['Armas de fogo apreendidas', armas],
     ['Ocorrências com drogas', comDrogas], ['Homicídios', hom, true], ['Tentativas de homicídio', ten, true]];
   $('#kpis').innerHTML = k.map(([l, v, a]) => `<div class="kpi${a ? ' alert-k' : ''}"><b>${fmtN(v)}</b><span>${esc(l)}</span></div>`).join('');
 
@@ -691,10 +693,13 @@ const MAP_CATS = [
   ['tco', 'TCO', '#e0a800', r => +r.tco || 0],
   ['mandados', 'Mandados', '#16a2b8', r => +r.mandados || 0],
   ['veiculos', 'Veículos recuperados', '#2e8b57', r => +r.veiculos || 0],
-  ['armas', 'Armas apreendidas', '#14130f', r => (r.guns || []).reduce((x, g) => x + (+g.qty || 0), 0)],
+  ['armas', 'Armas de fogo apreendidas', '#14130f', r => (r.guns || []).reduce((x, g) => x + (+g.qty || 0), 0)],
   ['drogas', 'Ocorrências com drogas', '#c2185b', r => (r.drugs || []).length ? 1 : 0],
   ['homicidios', 'Homicídios', '#b71c1c', r => r.crime_category === 'homicidio' ? 1 : 0],
   ['tentativas', 'Tentativas de homicídio', '#ef6c00', r => r.crime_category === 'tentativa_homicidio' ? 1 : 0],
+  ['armas_brancas', 'Armas brancas apreendidas', '#6d4c41', r => +r.armas_brancas || 0],
+  ['simulacros', 'Simulacros apreendidos', '#7cb342', r => +r.simulacros || 0],
+  ['adolescentes', 'Adolescentes apreendidos', '#4a3fb5', r => +r.adolescentes || 0],
 ];
 const OTHER_CAT = ['outras', 'Outras ocorrências', '#8f8f8f'];
 const isOther = r => MAP_CATS.every(c => !c[3](r));
@@ -886,7 +891,7 @@ function editorHTML(r = {}) {
   <div class="grid ind">${IND.map(([k, l]) => `<label>${l}<input type="number" min="0" max="100000" step="1" name="${k}" value="${+r[k] || 0}"></label>`).join('')}</div>
   <div class="seiz"><div class="seiz-h"><strong>Drogas apreendidas</strong><button type="button" class="btn sm" data-add="drug">+ Droga</button></div>
     <div class="list drugs">${(r.drugs || []).map(drugRow).join('')}</div></div>
-  <div class="seiz"><div class="seiz-h"><strong>Armas apreendidas</strong><button type="button" class="btn sm" data-add="gun">+ Arma</button></div>
+  <div class="seiz"><div class="seiz-h"><strong>Armas de fogo apreendidas</strong><button type="button" class="btn sm" data-add="gun">+ Arma</button></div>
     <div class="list guns">${(r.guns || []).map(gunRow).join('')}</div></div>
   <div class="ed-foot">
     <label>Observações<textarea name="notes" maxlength="750">${v('notes')}</textarea></label>
@@ -1033,7 +1038,7 @@ function renderTable() {
     return `<tr data-id="${esc(r.id)}"><td>${fmtD(r.date)}</td><td>${esc(r.time)}</td><td>${esc(r.ref)}</td><td>${esc(r.kind)}</td><td>${tag}</td><td>${esc(r.cia)}</td><td>${esc(r.city)}</td><td>${esc(r.neighborhood)}</td>
       ${IND.map(([k]) => `<td class="n">${+r[k] || ''}</td>`).join('')}<td class="small">${esc(ap)}</td>
       <td class="acts">${r.lat != null ? `<a class="btn sm ghost" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${r.lat},${r.lon}" title="Abrir a coordenada no Google Maps">Mapa</a> ` : ''}<button type="button" class="btn sm" data-edit>Editar</button> <button type="button" class="btn sm ghost danger" data-remove>Excluir</button></td></tr>`;
-  }).join('') || '<tr><td colspan="15" class="muted">Nenhuma ocorrência encontrada.</td></tr>';
+  }).join('') || '<tr><td colspan="18" class="muted">Nenhuma ocorrência encontrada.</td></tr>';
   $('#tblInfo').textContent = `${fmtN(rs.length)} registro(s)` + (rs.length > shown.length ? ` · exibindo os ${shown.length} mais recentes; refine a busca.` : '');
 }
 let editingId = null;
@@ -1090,7 +1095,7 @@ function shiftYear(s, n) {
 function statsOf(rs) {
   const s = { 'Ocorrências': rs.length };
   IND.forEach(([k, l]) => { s[l] = rs.reduce((a, r) => a + (+r[k] || 0), 0); });
-  s['Armas apreendidas'] = rs.reduce((a, r) => a + (r.guns || []).reduce((x, g) => x + (+g.qty || 0), 0), 0);
+  s['Armas de fogo apreendidas'] = rs.reduce((a, r) => a + (r.guns || []).reduce((x, g) => x + (+g.qty || 0), 0), 0);
   s['Ocorrências com drogas'] = rs.filter(r => (r.drugs || []).length).length;
   s['Homicídios'] = rs.filter(r => r.crime_category === 'homicidio').length;
   s['Tentativas de homicídio'] = rs.filter(r => r.crime_category === 'tentativa_homicidio').length;
@@ -1156,7 +1161,9 @@ function reportText(f, a, b, cur, rs, cmp, prev) {
   }
   t += '. ';
   if (!n) return t.trim();
-  t += `Produtividade: ${pl(cur['Conduções'], 'condução', 'conduções')}, ${pl(cur['Flagrantes'], 'flagrante', 'flagrantes')}, ${fmtN(cur['TCO'])} TCO, ${pl(cur['Mandados'], 'mandado cumprido', 'mandados cumpridos')} e ${pl(cur['Veículos recuperados'], 'veículo recuperado', 'veículos recuperados')}; ${pl(cur['Armas apreendidas'], 'arma apreendida', 'armas apreendidas')} e drogas em ${pl(cur['Ocorrências com drogas'], 'ocorrência', 'ocorrências')}. `;
+  t += `Produtividade: ${pl(cur['Conduções'], 'condução', 'conduções')}, ${pl(cur['Flagrantes'], 'flagrante', 'flagrantes')}, ${fmtN(cur['TCO'])} TCO, ${pl(cur['Mandados'], 'mandado cumprido', 'mandados cumpridos')} e ${pl(cur['Veículos recuperados'], 'veículo recuperado', 'veículos recuperados')}; ${pl(cur['Armas de fogo apreendidas'], 'arma de fogo apreendida', 'armas de fogo apreendidas')} e drogas em ${pl(cur['Ocorrências com drogas'], 'ocorrência', 'ocorrências')}. `;
+  const extra = [[cur['Armas brancas apreendidas'], 'arma branca apreendida', 'armas brancas apreendidas'], [cur['Simulacros apreendidos'], 'simulacro apreendido', 'simulacros apreendidos'], [cur['Adolescentes apreendidos'], 'adolescente apreendido', 'adolescentes apreendidos']].filter(x => x[0]).map(x => pl(...x));
+  if (extra.length) t += `Também: ${extra.join(', ')}. `;
   const h = cur['Homicídios'], te = cur['Tentativas de homicídio'];
   t += h || te ? `Crimes violentos: ${pl(h, 'homicídio', 'homicídios')} e ${pl(te, 'tentativa', 'tentativas')} de homicídio. ` : 'Sem registro de homicídio ou tentativa de homicídio. ';
   const hs = [];
@@ -1222,10 +1229,10 @@ function renderReport() {
       <div><h3>Bairros com mais ocorrências</h3><div class="hbars" data-h="nb"></div></div>
       <div><h3>Ocorrências por cidade</h3><div class="hbars" data-h="city"></div></div>
       <div><h3>Drogas apreendidas</h3>${drugs}</div>
-      <div><h3>Armas apreendidas</h3>${guns}</div>
+      <div><h3>Armas de fogo apreendidas</h3>${guns}</div>
     </div>
     ${viol.length ? `<h3>Crimes violentos no período</h3><table><thead><tr><th>Data</th><th>Hora</th><th>Nº</th><th>Crime</th><th>CIA</th><th>Bairro</th><th>Cidade</th></tr></thead><tbody>${viol.map(r => `<tr><td>${fmtD(r.date)}</td><td>${esc(r.time)}</td><td>${esc(r.ref)}</td><td>${CATS[r.crime_category]}</td><td>${esc(r.cia)}</td><td>${esc(r.neighborhood)}</td><td>${esc(r.city)}</td></tr>`).join('')}</tbody></table>` : ''}
-    ${$('#rList').value && rs.length ? `<h3>Relação de ocorrências (${fmtN(rs.length)})</h3><table><thead><tr><th>Data</th><th>Hora</th><th>Nº</th><th>Tipo</th><th>CIA</th><th>Bairro / cidade</th><th class="n" title="Conduções">Cond.</th><th class="n" title="Flagrantes">Flag.</th><th class="n">TCO</th><th class="n" title="Mandados">Mand.</th><th class="n" title="Veículos recuperados">Veíc.</th></tr></thead><tbody>${rs.map(r => `<tr><td>${fmtD(r.date)}</td><td>${esc(r.time)}</td><td>${esc(r.ref)}</td><td>${esc(r.kind)}</td><td>${esc(r.cia)}</td><td>${esc([r.neighborhood, r.city].filter(Boolean).join(' / '))}</td>${IND.map(([k]) => `<td class="n">${+r[k] || ''}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}
+    ${$('#rList').value && rs.length ? `<h3>Relação de ocorrências (${fmtN(rs.length)})</h3><table><thead><tr><th>Data</th><th>Hora</th><th>Nº</th><th>Tipo</th><th>CIA</th><th>Bairro / cidade</th>${indHead()}</tr></thead><tbody>${rs.map(r => `<tr><td>${fmtD(r.date)}</td><td>${esc(r.time)}</td><td>${esc(r.ref)}</td><td>${esc(r.kind)}</td><td>${esc(r.cia)}</td><td>${esc([r.neighborhood, r.city].filter(Boolean).join(' / '))}</td>${IND.map(([k]) => `<td class="n">${+r[k] || ''}</td>`).join('')}</tr>`).join('')}</tbody></table>` : ''}
     ` + repFoot();
   $$('.gb', box).forEach((el, i) => { $('.c', el).style.height = (cb[i] / topB * 100) + '%'; if (cmp) $('.p', el).style.height = (pb[i] / topB * 100) + '%'; });
   hbars($('[data-h=cia]', box), countBy(rs, r => r.cia), 8); hbars($('[data-h=kind]', box), countBy(rs, tk), 8);
@@ -1245,7 +1252,7 @@ function indChecks(box, which) {
   return MAP_CATS.filter(c => !off.has(c[0]));
 }
 const lowName = l => l.replace(/^(?!TCO)./, ch => ch.toLowerCase());
-const SELNAME = { conducoes: 'Só com conduções', flagrantes: 'Só com flagrantes', tco: 'Só com TCO', mandados: 'Só com mandados', veiculos: 'Só com veículos recuperados', armas: 'Só com armas apreendidas', drogas: 'Só ocorrências com drogas', homicidios: 'Só homicídios', tentativas: 'Só tentativas de homicídio' };
+const SELNAME = { conducoes: 'Só com conduções', flagrantes: 'Só com flagrantes', tco: 'Só com TCO', mandados: 'Só com mandados', veiculos: 'Só com veículos recuperados', armas: 'Só com armas apreendidas', drogas: 'Só ocorrências com drogas', homicidios: 'Só homicídios', tentativas: 'Só tentativas de homicídio', armas_brancas: 'Só com armas brancas apreendidas', simulacros: 'Só com simulacros apreendidos', adolescentes: 'Só com adolescentes apreendidos' };
 const INDSEL = `<option value="">Todas as ocorrências</option>${MAP_CATS.map(([id]) => `<option value="${id}">${SELNAME[id]}</option>`).join('')}<option value="outras">Só outras ocorrências</option>`;
 const indName = id => id === 'outras' ? 'Outras ocorrências' : (MAP_CATS.find(c => c[0] === id) || [, ''])[1];
 const varCell = (c, p) => { const [cl, t] = variation(c, p); return `<small class="vc ${cl}">${fmtN(p)} · ${t.replace(' sem registro na comparação', ' novo').replace('= sem variação', '=')}</small>`; };
@@ -1285,7 +1292,7 @@ function renderProd() {
   const st = cias.map(c => [c, statsOf(rs.filter(r => r.cia === c)), statsOf(ps.filter(r => r.cia === c))]).sort((x, y) => y[1]['Ocorrências'] - x[1]['Ocorrências']);
   const tot = statsOf(rs), ptot = statsOf(ps), n = tot['Ocorrências'];
   const cols = ['Ocorrências', ...marked.map(c => c[1])];
-  const SHORT = { 'Veículos recuperados': 'Veíc. recup.', 'Armas apreendidas': 'Armas', 'Ocorrências com drogas': 'C/ drogas', 'Tentativas de homicídio': 'Tentativas', 'Ocorrências': 'Ocorr.' };
+  const SHORT = { 'Veículos recuperados': 'Veíc. recup.', 'Armas de fogo apreendidas': 'Armas fogo', 'Armas brancas apreendidas': 'A. brancas', 'Simulacros apreendidos': 'Simul.', 'Adolescentes apreendidos': 'Adolesc.', 'Ocorrências com drogas': 'C/ drogas', 'Tentativas de homicídio': 'Tentativas', 'Ocorrências': 'Ocorr.' };
   const scope = [ind ? `com ${lowName(indName(ind))}` : '', type ? `de “${kindLabel(type)}”` : ''].filter(Boolean).join(' ');
   let text;
   if (!cias.length) text = 'Marque ao menos uma CIA para gerar o relatório.';

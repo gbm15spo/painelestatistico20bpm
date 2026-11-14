@@ -4,7 +4,7 @@ import json
 import re
 import unicodedata
 
-COUNT_FIELDS = ('conducoes','flagrantes','tco','mandados','veiculos')
+COUNT_FIELDS = ('conducoes','flagrantes','tco','mandados','veiculos','armas_brancas','simulacros','adolescentes')
 DRUG_UNITS = {'g','kg','porções','unidades','comprimidos','ml','L','pés'}
 
 def normal(s):
@@ -27,6 +27,167 @@ def bairro_from_address(address):
     normal_address=re.sub(r'\s+', ' ',address)
     match=re.search(r',\s*([^,]+?)\s*-\s*ZONA\s+(?:URBANA|RURAL)\b',normal_address,re.I)
     return match.group(1).strip().title() if match else ''
+
+
+NUM_WORDS = {'UM':1,'UMA':1,'DOIS':2,'DUAS':2,'TRES':3,'QUATRO':4,'CINCO':5,'SEIS':6,'SETE':7,'OITO':8,'NOVE':9,'DEZ':10}
+_QTY = r'(?:(?P<n>\d{1,4})\s*(?:\([A-Z ]+\)\s*)?|\(\s*(?P<n2>\d{1,4})\s*\)\s*(?:[A-Z]+\s+)?|(?P<w>UMA?|DOIS|DUAS|TRES|QUATRO|CINCO|SEIS|SETE|OITO|NOVE|DEZ)\s+)?'
+_SEIZE = r'APREEN|ARRECAD|RECOLHID|ENCONTRAD|LOCALIZAD|ENTREG|APRESENTA|CONDUZID|ENCAMINHAD'
+_NEG = r'\b(?:NAO|SEM|NADA|NENHUM|NENHUMA|INEXIST\w*|NEGATIV\w*)\b'
+_STATION = r'DELEGACIA|DEPOL|\bD\.?P\.?\b|\bDT\b|\bDEAM\b|\bDISEP\b|\bCOORPIN\b|POLICIA CIVIL|POLICIA JUDICIARIA|AUTORIDADE POLICIAL|CENTRAL DE FLAGRANTES|PLANTAO POLICIAL|DELEGAD[OA]'
+FIREARMS = [('Revólver', r'REVOLVER(?:ES)?'), ('Pistola', r'PISTOLAS?'), ('Espingarda', r'ESPINGARDAS?|ESCOPETAS?|CARTUCHEIRAS?'), ('Fuzil', r'FUZIL|FUZIS'),
+            ('Carabina/Rifle', r'CARABINAS?|RIFLES?'), ('Submetralhadora', r'(?:SUB)?METRALHADORAS?'), ('Garrucha', r'GARRUCHAS?'),
+            ('Arma de fabricação caseira', r'ARMAS? (?:DE FOGO )?(?:DE FABRICACAO )?(?:CASEIRA|ARTESANAL)S?'), ('Arma de fogo', r'ARMAS? DE FOGO')]
+BLADES = r'ARMAS? BRANCAS?|FAC(?:AO|OES|AS|A)\b(?: (?:DO )?TIPO \w+)?|PEIXEIRAS?|CANIVETES?|PUNHAL|PUNHAIS|ADAGAS?|ESTILETES?|FOICES?|MACHAD(?:O|OS|INHA|INHAS)\b|TERCADOS?'
+FAKES = r'(?:SIMULACROS?|REPLICAS?|ARMAS? DE BRINQUEDO|ARMAS? DE AIRSOFT|AIRSOFT)(?: DE (?:ARMAS? DE FOGO|PISTOLAS?|REVOLVER(?:ES)?|FUZIL|FUZIS|ESPINGARDAS?))?'
+DRUGS = [('Maconha', r'MACONHA|CANNABIS'), ('Cocaína', r'COCAINA'), ('Crack', r'CRACK'), ('Haxixe', r'HAXIXE'), ('Skunk', r'SKUNK'), ('Ecstasy', r'ECSTASY'), ('LSD', r'\bLSD\b')]
+DRUG_UNIT_MAP = [(r'KG|QUILOS?|QUILOGRAMAS?', 'kg'), (r'G|GR|GRAMAS?', 'g'), (r'ML', 'ml'), (r'LITROS?', 'L'), (r'PES', 'pés'), (r'COMPRIMIDOS?', 'comprimidos'),
+                 (r'PORCAO|PORCOES|TROUXINHAS?|TROUXAS?|PEDRAS?|PINOS?|PAPELOTES?|BUCHAS?|DOLAS?|PETECAS?|EMBALAGENS?|INVOLUCROS?|SACOLES?', 'porções'),
+                 (r'UNIDADES?|TABLETES?|CIGARROS?|BARRAS?|PEDACOS?', 'unidades')]
+
+
+def _num(m):
+    g = m.groupdict()
+    if g.get('n') or g.get('n2'):
+        return max(1, min(int(g.get('n') or g.get('n2')), 9999))
+    return NUM_WORDS.get(g.get('w') or '', 1)
+
+
+def _negated(text, pos):
+    """A menção vem logo depois de NÃO/SEM/NADA/NENHUM na mesma frase? (ex.: "não havia mandado de prisão")"""
+    return bool(re.search(_NEG + r'[^.;]{0,45}$', text[max(0, pos - 60):pos]))
+
+
+def _neg(text, m):
+    """Negação antes ("sem arma de fogo") ou logo depois ("a faca não foi encontrada")."""
+    return _negated(text, m.start()) or bool(re.match(r'\s*(?:[\w.]+\s+){0,3}NAO\b', text[m.end():]))
+
+
+def analyze_measures(kind, measures):
+    """Procura os indicadores no TIPO e nas MEDIDAS ADOTADAS PELA GUARNIÇÃO. Resultado é uma PRÉVIA para conferência humana."""
+    tipo, med = normal(kind), normal(measures)
+    sentences = [x.strip() for x in re.split(r'[.;]\s+|\s+-\s+|\n', med) if x.strip()]
+    both = [tipo] + sentences
+    w = []
+    r = {k: 0 for k in COUNT_FIELDS}
+    r['drugs'], r['guns'] = [], []
+
+    def hit(pattern, texts=both):
+        for t in texts:
+            for m in re.finditer(pattern, t):
+                if not _negated(t, m.start()):
+                    return True
+        return False
+
+    # Condução à delegacia
+    if hit(r'(?:CONDU[CZ]\w+|ENCAMINHA\w+|APRESENTA\w+|LEVAD[OA]S?|ENTREGUES?)[^.;]{0,140}(?:' + _STATION + r')|(?:' + _STATION + r')[^.;]{0,80}(?:CONDUZID|ENCAMINHAD|APRESENTAD)', sentences) \
+            or hit(r'CONDUCAO (?:A|PARA A|ATE A) (?:' + _STATION + ')', [tipo]):
+        r['conducoes'] = 1
+    # Prisão em flagrante
+    if hit(r'PRES[OA]S? EM FLAGRANTE|PRISAO(?:OES)? EM FLAGRANTE|PRISOES EM FLAGRANTE|AUTUAD[OA]S? EM FLAGRANTE|AUTO DE PRISAO EM FLAGRANTE|FLAGRANTEAD[OA]S?|FLAGRANTE DELITO|VOZ DE PRISAO|(?:LAVR\w+|CONFECC\w+|REGISTR\w+|FORMALIZ\w+|RATIFIC\w+)[^.;]{0,50}\b(?:APF|FLAGRANTE)\b|\bAPF\b[^.;]{0,50}(?:LAVRAD|CONFECCIONAD|REGISTRAD|FORMALIZAD|RATIFICAD)'):
+        r['flagrantes'] = 1
+    elif re.search(r'\bAPF\b|FLAGRANTE', tipo + ' ' + med):
+        w.append('Há menção a flagrante/APF, mas sem confirmar a prisão. Confira o campo Flagrantes.')
+    # TCO
+    if hit(r'TERMO CIRCUNSTANCIA\w*|\bT\.?C\.?O\.?\b'):
+        r['tco'] = 1
+    # Cumprimento de mandado de prisão
+    if hit(r'(?:CUMPRI\w+|EXECU\w+)[^.;]{0,60}MANDADOS?[^.;]{0,25}PRISAO|MANDADOS?(?: JUDICIA(?:L|IS))? DE PRISAO[^.;]{0,80}(?:CUMPRID|EXECUTAD|EM ABERTO|EM DESFAVOR|EXPEDID)|(?:EM ABERTO|EM DESFAVOR)[^.;]{0,60}MANDADOS? DE PRISAO'):
+        r['mandados'] = 1
+    elif hit(r'MANDADOS?[^.;]{0,25}PRISAO'):
+        w.append('Há menção a mandado de prisão, mas sem confirmar o cumprimento. Confira o campo Mandados.')
+    # Veículos recuperados
+    veh = r'VEICULOS?|MOTOCICLETAS?|MOTOS?\b|MOTONETAS?|AUTOMOVE(?:L|IS)|CARROS?|CAMINHONETES?|CAMINHAO|CAMINHOES|CAMIONETES?'
+    n = 0
+    for t in both:
+        for m in re.finditer(_QTY + r'(?:' + veh + r')[^.;]{0,90}(?:RECUPERAD|RESTITUID|DEVOLVID\w+ AO PROPRIETARIO|COM RESTRICAO DE (?:ROUBO|FURTO)|COM QUEIXA DE (?:ROUBO|FURTO)|PRODUTO DE (?:ROUBO|FURTO)|ROUBAD[OA]S? (?:FOI|FORAM) LOCALIZAD)|(?:RECUPERACAO|RECUPERAD[OA]S?|RESTITUICAO) (?:D[EO]S? )?' + _QTY.replace('<n>', '<n3>').replace('<n2>', '<n4>').replace('<w>', '<w2>') + r'(?:' + veh + r')', t):
+            if _negated(t, m.start()): continue
+            g = m.groupdict()
+            n += _num(m) if (g.get('n') or g.get('n2') or g.get('w')) else (max(1, int(g['n3'] or g['n4'])) if (g.get('n3') or g.get('n4')) else NUM_WORDS.get(g.get('w2') or '', 1))
+    r['veiculos'] = min(n, 99)
+    if not n and re.search(r'DETRAN|GUINCH|REMOVID[OA] AO PATIO', med):
+        w.append('Veículo removido/recolhido não foi contado como recuperado.')
+
+    # Apreensões: só contam em frases com verbo de apreensão. TIPO como "tráfico" ou "porte" sozinho gera só aviso.
+    def seizing(t):
+        return bool(re.search(_SEIZE, t)) or (t is tipo and 'APREENS' in t)
+
+    fakes = blades = 0
+    guns = {}
+    drugs = {}
+    loose = set()
+    for t in both:
+        if not t: continue
+        ok = seizing(t)
+        # simulacros primeiro, para "simulacro de pistola" não virar arma de fogo
+        rest = t
+        for m in list(re.finditer(_QTY + r'(?:' + FAKES + r')', t)):
+            if _neg(t, m): continue
+            if ok: fakes += _num(m)
+            else: loose.add('simulacro')
+        rest = re.sub(FAKES, ' ', rest)
+        for m in re.finditer(_QTY + r'(?:' + BLADES + r')', rest):
+            if _neg(rest, m): continue
+            if ok: blades += _num(m)
+            else: loose.add('arma branca')
+        taken = []
+        for label, pat in FIREARMS:
+            for m in re.finditer(_QTY + r'(?:' + pat + r')\b', rest):
+                if any(a < m.end() and m.start() < b for a, b in taken) or _neg(rest, m): continue
+                taken.append((m.start(), m.end()))
+                if t is tipo and label == 'Arma de fogo': loose.add('arma de fogo (no TIPO)'); continue
+                if ok: guns[label] = guns.get(label, 0) + _num(m)
+                else: loose.add('arma de fogo')
+        for label, pat in DRUGS + [('Não especificada', r'ENTORPECENTES?|DROGAS?\b|SUBSTANCIAS? (?:ILICITAS?|ENTORPECENTES?|ANALOGAS?)(?! A)')]:
+            for m in re.finditer(pat, rest):
+                if _neg(rest, m): continue
+                if label == 'Não especificada' and (drugs or t is tipo and not ok):
+                    continue
+                if not ok: loose.add('droga'); continue
+                q = None
+                back = rest[max(0, m.start() - 90):m.start()]
+                units = '|'.join(u for u, _ in DRUG_UNIT_MAP)
+                qm = None
+                for qm in re.finditer(r'(\d{1,6}(?:[.,]\d{1,3})?)\s*(?:\([A-Z ]+\)\s*)?(' + units + r')\b', back): pass
+                if qm:
+                    unit = next(u for pat_u, u in DRUG_UNIT_MAP if re.fullmatch(pat_u, qm.group(2)))
+                    try: q = (float(qm.group(1).replace('.', '').replace(',', '.')) if ',' in qm.group(1) else float(qm.group(1)), unit)
+                    except ValueError: q = None
+                drugs.setdefault(label, [])
+                if q and q[0] > 0: drugs[label].append(q)
+    if drugs.get('Não especificada') is not None and len(drugs) > 1:
+        drugs.pop('Não especificada')
+    for label, qs in drugs.items():
+        if qs:
+            agg = {}
+            for q, u in qs: agg[u] = agg.get(u, 0) + q
+            for u, q in agg.items(): r['drugs'].append({'type': label, 'qty': round(q, 3), 'unit': u})
+        else:
+            r['drugs'].append({'type': label, 'qty': None, 'unit': 'g'})
+            w.append(f'Droga apreendida ({label}): quantidade não identificada — informe antes de salvar.')
+    r['guns'] = [{'type': k, 'qty': v} for k, v in guns.items()]
+    r['armas_brancas'], r['simulacros'] = min(blades, 999), min(fakes, 999)
+    if r['guns']: w.append('Arma(s) de fogo identificada(s): confira tipo e quantidade.')
+    if r['drugs']: w.append('Droga(s) identificada(s): confira tipo, quantidade e unidade.')
+    if r['guns']: loose.discard('arma de fogo (no TIPO)')
+    for x in sorted(loose):
+        w.append(f'Há menção a {x} sem indicação clara de apreensão: não foi contada. Confira.')
+
+    # Adolescentes apreendidos
+    teen = r'ADOLESCENTES?|MENOR(?:ES)?(?: DE IDADE| INFRATOR(?:ES)?)?\b'
+    n = 0
+    for t in both:
+        for m in re.finditer(_QTY + r'(?:' + teen + r')', t):
+            if _negated(t, m.start()): continue
+            ctx = t[max(0, m.start() - 90):m.end() + 110]
+            if re.search(r'APREEN', ctx) or (re.search(r'CONDUZID|ENCAMINHAD|APRESENTAD', ctx) and re.search(_STATION + r'|CONSELHO TUTELAR|MINISTERIO PUBLICO', ctx) and not re.search(r'VITIMA', ctx)):
+                n += _num(m); break
+        else:
+            continue
+    if not n and re.search(teen, tipo + ' ' + med):
+        w.append('Há menção a adolescente/menor sem indicação clara de apreensão: não foi contado. Confira.')
+    r['adolescentes'] = min(n, 99)
+    r['warnings'] = w
+    return r
 
 
 def pdf_preview(data: bytes):
@@ -92,29 +253,18 @@ def pdf_preview(data: bytes):
                 city = 'Paulo Afonso'
             else:
                 warnings.append('Cidade não identificada automaticamente.')
-        # Use MEDIDAS and DESCRIÇÃO sections, but avoid counting repeated narrative twice.
-        descriptive = normal(piece)
-        conducao = 1 if re.search(r'CONDU(?:CAO|ZID[OA]?|ZIMOS|ZIR|ZIDO).*?(?:DELEGACIA|POLICIA CIVIL|\bDP\b)|(?:DELEGACIA|\bDP\b).*?CONDUZID[OA]', descriptive, re.S) else 0
-        # Must not classify acronym APF as arrest without corroboration.
-        flagrante = 1 if re.search(r'(?:PRES[OA]|PRISAO) EM FLAGRANTE|AUTUAD[OA] EM FLAGRANTE|FLAGRANTE DELITO FORMALIZAD', descriptive) else 0
-        if 'APF' in descriptive and not flagrante:
-            warnings.append('Menção a APF: prisão em flagrante NÃO confirmada pelo documento. Verifique o auto.')
-        tco = 1 if re.search(r'TERMO CIRCUNSTANCIADO (?:DE OCORRENCIA|LAVRADO)|\bTCO\b.{0,35}LAVRAD|LAVRAD.{0,35}\bTCO\b', descriptive) else 0
-        mandados = 1 if re.search(r'MANDADO DE PRISAO (?:CUMPRID|EXECUTAD)|CUMPRIMENTO DE MANDADO DE PRISAO', descriptive) else 0
-        veiculos = 1 if re.search(r'VEICULO[S]? RECUPERADO[S]?|RECUPERACAO DE VEICULO', descriptive) else 0
-        # A bare seized/towed vehicle is not a recovered vehicle.
-        if 'DETRAN' in descriptive and not veiculos:
-            warnings.append('Veículo recolhido ao DETRAN não foi contabilizado como recuperado.')
-        if re.search(r'\b(?:MACONHA|COCAINA|CRACK|ECSTASY|HAXIXE|LSD|SKUNK)\b', descriptive):
-            warnings.append('Há referência a drogas. Confira tipo, quantidade e contexto antes de informar apreensões.')
-        if re.search(r'ARMA[S]? DE FOGO APREENDID|(?:REVOLVER|PISTOLA|FUZIL|ESPINGARDA) APREENDID', descriptive):
-            warnings.append('Há referência a armas. Informe tipos/quantidades somente após conferir.')
+        # Indicadores: lidos SOMENTE do TIPO e da seção MEDIDAS ADOTADAS PELA GUARNIÇÃO.
+        med = re.search(r'MEDIDAS\s+ADOTADAS(?:\s+PELA\s+GUARNI[ÇC][ÃA]O)?\s*:?(.*?)(?=SA[ÍI]DA\s+DA\s+DP|POLICIAIS\s+QUE\s+ATENDERAM|\[N[º°o]|OBJETOS\s+RELACIONADOS|\Z)', piece, re.I | re.S)
+        measures = med.group(1) if med else ''
+        if not measures.strip():
+            warnings.append('Seção "MEDIDAS ADOTADAS PELA GUARNIÇÃO" não encontrada ou vazia: indicadores lidos só do TIPO.')
+        found = analyze_measures(m.group(1), measures)
+        warnings.extend(found.pop('warnings'))
         warnings.append('Conferência humana obrigatória: verifique indicadores, local e CIA.')
         rows.append({
             'date': day, 'time': date_match.group(2) or '', 'cia': cia, 'city': city,
             'location': address[:350], 'neighborhood': bairro_from_address(address), 'ref': m.group(2), 'kind': re.sub(r'\s+',' ',m.group(1)).strip()[:120], 'crime_category': crime_type(m.group(1)),
-            'conducoes': conducao, 'flagrantes': flagrante, 'tco': tco,
-            'mandados': mandados, 'veiculos': veiculos, 'drugs': [], 'guns': [],
+            **found,
             'notes': '', 'source': 'PDF (revisado pelo administrador)', 'warnings': warnings
         })
     if not rows:

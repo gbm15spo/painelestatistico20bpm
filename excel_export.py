@@ -7,7 +7,7 @@ from itertools import groupby
 from xml.sax.saxutils import escape
 from zipfile import ZipFile, ZIP_DEFLATED
 
-INDICATORS = [('conducoes','Conduções'),('flagrantes','Flagrantes'),('tco','TCO'),('mandados','Mandados'),('veiculos','Veículos recuperados')]
+INDICATORS = [('conducoes','Conduções'),('flagrantes','Flagrantes'),('tco','TCO'),('mandados','Mandados'),('veiculos','Veículos recuperados'),('armas_brancas','Armas brancas apreendidas'),('simulacros','Simulacros apreendidos'),('adolescentes','Adolescentes apreendidos')]
 
 def _col(n):
     s=''
@@ -38,7 +38,7 @@ def _sheet(rows):
 
 def build_xlsx(records):
     ordered=sorted(records,key=lambda r:(r.get('date',''),r.get('ref','')))
-    rows=[['Data','Horário','Número','Tipo','Classificação','CIA','Cidade','Bairro','Endereço / local','Conduções','Flagrantes','TCO','Mandados','Veículos recuperados','Drogas detalhadas','Armas detalhadas','Observações','Origem']]
+    rows=[['Data','Horário','Número','Tipo','Classificação','CIA','Cidade','Bairro','Endereço / local','Conduções','Flagrantes','TCO','Mandados','Veículos recuperados','Armas brancas apreendidas','Simulacros apreendidos','Adolescentes apreendidos','Drogas detalhadas','Armas de fogo detalhadas','Observações','Origem']]
     drugs=[['Data','Ocorrência','CIA','Cidade','Bairro','Droga','Quantidade','Unidade']]
     guns=[['Data','Ocorrência','CIA','Cidade','Bairro','Arma','Quantidade']]
     crimes=[['Data','Horário','Número','Crime','CIA','Cidade','Bairro','Local','Observações']]
@@ -60,11 +60,11 @@ def build_xlsx(records):
         for c in counters:
             c['Ocorrências']+=1
             for field,display in INDICATORS:c[display]+=int(r.get(field,0))
-            c['Armas']+=sum(int(g.get('qty',0)) for g in r.get('guns',[]))
+            c['Armas de fogo']+=sum(int(g.get('qty',0)) for g in r.get('guns',[]))
             c['Ocorrências com drogas']+=int(bool(r.get('drugs')))
             c['Homicídios']+=int(cls=='homicidio')
             c['Tentativas']+=int(cls=='tentativa_homicidio')
-    metric_cols=['Ocorrências']+[display for _,display in INDICATORS]+['Armas','Ocorrências com drogas','Homicídios','Tentativas']
+    metric_cols=['Ocorrências']+[display for _,display in INDICATORS]+['Armas de fogo','Ocorrências com drogas','Homicídios','Tentativas']
     def summary(group,head):
         out=[head+metric_cols]
         for key,c in sorted(group.items()):

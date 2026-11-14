@@ -8,7 +8,7 @@ CATS = {'homicidio': 'Homicídio', 'tentativa_homicidio': 'Tentativa de homicíd
 # (título, largura relativa, alinhamento)
 COLS = [('Data', 5.2, 0), ('Hora', 3.6, 0), ('Nº', 6.5, 0), ('Natureza', 11, 0), ('Classif.', 6.5, 0), ('CIA', 5.5, 0),
         ('Cidade', 7, 0), ('Bairro', 7.5, 0), ('Endereço / local', 13, 0), ('Cond.', 3.2, 1), ('Flag.', 3.2, 1),
-        ('TCO', 3, 1), ('Mand.', 3.3, 1), ('Veíc.', 3.2, 1), ('Drogas', 9, 0), ('Armas', 7.5, 0), ('Observações', 11, 0)]
+        ('TCO', 3, 1), ('Mand.', 3.3, 1), ('Veíc.', 3.2, 1), ('A.br.', 3.2, 1), ('Simul.', 3.4, 1), ('Adol.', 3.2, 1), ('Drogas', 8.5, 0), ('Armas de fogo', 7.5, 0), ('Observações', 9.5, 0)]
 
 
 def _row(r):
@@ -19,7 +19,7 @@ def _row(r):
     n = lambda k: str(int(r.get(k, 0) or 0) or '')
     return [date, r.get('time', ''), r.get('ref', ''), r.get('kind', ''), CATS.get(r.get('crime_category'), 'Outros'),
             r.get('cia', ''), r.get('city', ''), r.get('neighborhood', ''), r.get('location', ''),
-            n('conducoes'), n('flagrantes'), n('tco'), n('mandados'), n('veiculos'), drugs, guns, r.get('notes', '')]
+            n('conducoes'), n('flagrantes'), n('tco'), n('mandados'), n('veiculos'), n('armas_brancas'), n('simulacros'), n('adolescentes'), drugs, guns, r.get('notes', '')]
 
 
 def build_pdf(records, username=''):
@@ -31,7 +31,7 @@ def build_pdf(records, username=''):
     for i, r in enumerate(ordered):
         cells = ''.join(f'<td class="{"c" if COLS[j][2] else ""}">{escape(str(v or ""))}</td>' for j, v in enumerate(_row(r)))
         body.append(f'<tr class="{"z" if i % 2 else ""}">{cells}</tr>')
-    sums = {k: sum(int(r.get(k, 0) or 0) for r in ordered) for k in ('conducoes', 'flagrantes', 'tco', 'mandados', 'veiculos')}
+    sums = {k: sum(int(r.get(k, 0) or 0) for r in ordered) for k in ('conducoes', 'flagrantes', 'tco', 'mandados', 'veiculos', 'armas_brancas', 'simulacros', 'adolescentes')}
     now = dt.datetime.now(dt.timezone(dt.timedelta(hours=-3))).strftime('%d/%m/%Y %H:%M')
     period = ''
     if ordered:
@@ -39,7 +39,7 @@ def build_pdf(records, username=''):
         period = f" · Período: {f(ordered[0]['date'])} a {f(ordered[-1]['date'])}"
     html = f'''<h1>PMBA - 20 BPM · POLÍCIA MILITAR DA BAHIA · 20º BATALHÃO DE POLÍCIA MILITAR</h1>
 <h2>Planilha geral de ocorrências</h2>
-<p class="m">{len(ordered)} ocorrência(s){period} · Conduções: {sums['conducoes']} · Flagrantes: {sums['flagrantes']} · TCO: {sums['tco']} · Mandados: {sums['mandados']} · Veículos recuperados: {sums['veiculos']}</p>
+<p class="m">{len(ordered)} ocorrência(s){period} · Conduções: {sums['conducoes']} · Flagrantes: {sums['flagrantes']} · TCO: {sums['tco']} · Mandados: {sums['mandados']} · Veículos recuperados: {sums['veiculos']} · Armas brancas: {sums['armas_brancas']} · Simulacros: {sums['simulacros']} · Adolescentes apreendidos: {sums['adolescentes']}</p>
 <p class="m">Emitido em {now}{(' por ' + escape(username)) if username else ''} · Documento de uso interno — contém dados restritos.</p>
 <table><thead><tr>{head}</tr></thead><tbody>{''.join(body) or f'<tr><td colspan="{len(COLS)}">Nenhuma ocorrência cadastrada.</td></tr>'}</tbody></table>'''
     css = '''body{font-family:sans-serif;font-size:6.6pt;color:#16202b}
