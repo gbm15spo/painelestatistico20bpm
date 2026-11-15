@@ -138,11 +138,22 @@ def analyze_measures(kind, measures):
     raw = re.sub(r'\((?:S|ES|IS)\)', '', raw)                      # TROUXINHA(S) -> TROUXINHA
     raw = re.sub(r'USUARI[OA]S? DE (?:DROGAS?|ENTORPECENTES?)', ' ', raw)
     # campos estruturados
-    tags, docs = {}, set()
-    for m in re.finditer(r'\[\s*N\S*\s+DOC\.?\s+([A-Z ]+?)\s*:\s*([^\]]*)\]', raw):
-        if re.search(r'\d', m.group(2)): docs.add(m.group(1).strip())
+    raw = re.sub(r'\bA\.?\s?P\.?\s?F\.?\s?D\.?(?=\W)', 'APF', raw)        # APFD = APF (auto de prisão em flagrante)
+    # Documentos gerados: [Nº DOC TCO: 29130/2026] -> o número é o CÓDIGO do documento; conta 1 documento por código.
+    tags, docs = {}, {}
+    for m in re.finditer(r'\[\s*N\W{0,3}O?\.?\s*(?:D[OE]\s+)?DOC(?:UMENTO)?\.?\s+([A-Z ]+?)\s*:\s*([^\]]*)\]', raw):
+        if re.search(r'\d', m.group(2)):
+            docs.setdefault(m.group(1).strip(), set()).add(re.sub(r'\s', '', m.group(2)))
+    # Quantidades: [TCO: 1], [ARMAS BRANCAS: 2]. Só vale número pequeno e sozinho; campos de número/código ficam de fora.
     for m in re.finditer(r'\[\s*([A-Z][A-Z /.]{1,40}?)\s*:\s*(\d{1,4})\s*\]', raw):
-        tags[m.group(1).strip()] = tags.get(m.group(1).strip(), 0) + int(m.group(2))
+        name, val = m.group(1).strip(), int(m.group(2))
+        if re.match(r'(?:N|NO|NR|NUM|NUMERO)\b|.*\b(?:DOC|DOCUMENTO|BOLETIM|PROTOCOLO|PROCESSO|CODIGO|MATRICULA|MAT)\b', name):
+            continue
+        if val > 50:
+            tags.setdefault('__big__', []).append((name, val)); continue
+        tags[name] = tags.get(name, 0) + val
+    big = tags.pop('__big__', [])
+    doc_count = lambda pred: sum(len(v) for k, v in docs.items() if pred(k))
     in_dp = bool(re.search(r'ENTRADA NA DP\s*:\s*\d', raw))   # só a SAÍDA preenchida não comprova condução
     body = re.sub(r'\[[^\]]*\]', '\n', raw)
     body = re.sub(r'(?:ENTRADA|SAIDA|PERMANENCIA) NA DP\s*:\s*[\d:H]*|SAIDA DA DP\s*:\s*[\d:H]*', '\n', body)
@@ -169,12 +180,15 @@ def analyze_measures(kind, measures):
             or hit(r'CONDUCAO (?:A|PARA A|ATE A) (?:' + _STATION + ')', [tipo]):
         r['conducoes'] = 1
     # Prisão em flagrante
-    if any('APF' in d.split() or 'FLAGRANTE' in d for d in docs) or hit(r'PRES[OA]S? EM FLAGRANTE|PRISAO EM FLAGRANTE|PRISOES EM FLAGRANTE|AUTUAD[OA]S? EM FLAGRANTE|AUTO DE PRISAO EM FLAGRANTE|FLAGRANTEAD[OA]S?|VOZ DE PRISAO|(?:LAVR\w+|CONFECC\w+|REGISTR\w+|FORMALIZ\w+|RATIFIC\w+)[^.;]{0,50}\b(?:APF|FLAGRANTE)\b|\bAPF\b[^.;]{0,50}(?:LAVRAD|CONFECCIONAD|REGISTRAD|FORMALIZAD|RATIFICAD)'):
+    if doc_count(lambda d: 'APF' in d.split() or 'FLAGRANTE' in d) or hit(r'PRES[OA]S? EM FLAGRANTE|PRISAO EM FLAGRANTE|PRISOES EM FLAGRANTE|AUTUAD[OA]S? EM FLAGRANTE|AUTO DE PRISAO EM FLAGRANTE|FLAGRANTEAD[OA]S?|VOZ DE PRISAO|(?:LAVR\w+|CONFECC\w+|REGISTR\w+|FORMALIZ\w+|RATIFIC\w+)[^.;]{0,50}\b(?:APF|FLAGRANTE)\b|\bAPF\b[^.;]{0,50}(?:LAVRAD|CONFECCIONAD|REGISTRAD|FORMALIZAD|RATIFICAD)'):
         r['flagrantes'] = 1
     elif hit(r'\bAPF\b|FLAGRANTE'):
         w.append('Há menção a flagrante/APF, mas sem confirmar a prisão. Confira o campo Flagrantes.')
     # TCO
-    if any('TCO' in d.split() or 'CIRCUNSTANCIAD' in d for d in docs) or hit(r'TERMO CIRCUNSTANCIA\w*|\bT\.?C\.?O\.?\b'):
+    n_tco_docs = doc_count(lambda d: 'TCO' in d.split() or 'CIRCUNSTANCIAD' in d)
+    if n_tco_docs:
+        r['tco'] = n_tco_docs                                  # um TCO por documento gerado
+    elif hit(r'TERMO CIRCUNSTANCIA\w*|\bT\.?C\.?O\.?\b'):
         r['tco'] = 1
     # Cumprimento de mandado de prisão
     if hit(r'(?:CUMPRI\w+|EXECU\w+)[^.;]{0,60}MANDADOS?[^.;]{0,25}PRISAO|MANDADOS?(?: JUDICIA(?:L|IS))? DE PRISAO[^.;]{0,80}(?:CUMPRID|EXECUTAD|EM ABERTO|EM DESFAVOR|EXPEDID)|(?:EM ABERTO|EM DESFAVOR)[^.;]{0,60}MANDADOS? DE PRISAO|MANDADO EM ABERTO'):
@@ -278,6 +292,8 @@ def analyze_measures(kind, measures):
         w.append('O TIPO indica ato infracional/adolescente, mas a apreensão não está clara nas medidas. Confira.')
 
     # Campos estruturados do relatório ([TCO: 1], [ARMAS BRANCAS: 1]...) valem mais que o texto
+    for name, val in big:
+        w.append(f'Campo [{name.title()}: {val}] ignorado: o número parece um código, não uma quantidade. Confira.')
     for name, val in tags.items():
         f = _tag_field(name)
         if f is None:
