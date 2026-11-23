@@ -61,6 +61,26 @@ def canon_bairros(pairs):
     return {k: max(v.items(), key=lambda kv: (sum(ord(ch) > 127 for ch in kv[0]), kv[1], kv[0]))[0] for k, v in seen.items()}
 
 
+# Municípios da área do 20º BPM (grafia oficial). A planilha CVLI usa abreviações ("CEL. JOÃO SÁ").
+_CITIES = ['Abaré', 'Antas', 'Chorrochó', 'Coronel João Sá', 'Glória', 'Jeremoabo', 'Macururé', 'Novo Triunfo',
+           'Paulo Afonso', 'Pedro Alexandre', 'Rodelas', 'Santa Brígida', 'Sítio do Quinto']
+_CITY_KEYS = {re.sub(r'[^A-Z]', '', normal(c)): c for c in _CITIES}
+_CITY_KEYS['CELJOAOSA'] = 'Coronel João Sá'
+
+
+def norm_city(name):
+    """Grafia padrão do município (com acento); nomes desconhecidos ficam como vieram, só com espaços acertados."""
+    s = re.sub(r'\s+', ' ', str(name or '')).strip(' ,.;-')
+    if not s: return ''
+    k = re.sub(r'[^A-Z]', '', normal(s.replace('CEL.', 'CEL ').replace('Cel.', 'Cel ')))
+    if k in _CITY_KEYS: return _CITY_KEYS[k]
+    return ' '.join(w if w.lower() not in _MINUSC or i == 0 else w.lower() for i, w in enumerate(s.title().split(' ')))[:100]
+
+
+CVLI_TYPES = ('Homicídio', 'Feminicídio', 'Latrocínio', 'Lesão corporal seguida de morte')
+CVLI_MEANS = ('Arma de fogo', 'Arma branca', 'Outro meio', 'Não informado')
+
+
 SOCIAL_TYPES = r'SUICID|APOIO|AUXILIO|SOCORRO|SURTO|DESAPAREC|ESCOLTA|PESSOA PERDIDA|ALIENAD|TRANSPORTE DE|PARTURIENTE|ANIMAL|OUTRAS OCORRENCIAS NAO RELACIONADAS|ACIDENTE DE VEICULO SEM VITIMA'
 GROUPS = ('policial', 'social')
 
@@ -403,9 +423,10 @@ def pdf_preview(data: bytes):
             warnings.append(f'Pessoas presas em flagrante: {authors} (pelos autores listados). Confira.')
         warnings.append('Conferência humana obrigatória: verifique indicadores, local e CIA.')
         rows.append({
-            'date': day, 'time': date_match.group(2) or '', 'cia': cia, 'city': city,
+            'date': day, 'time': date_match.group(2) or '', 'cia': cia, 'city': norm_city(city) or city,
             'location': address[:350], 'neighborhood': bairro_from_address(address), 'ref': m.group(2), 'kind': re.sub(r'\s+',' ',m.group(1)).strip()[:120], 'crime_category': crime_type(m.group(1)),
             **found, 'grupo': auto_group(m.group(1)),
+            **({'vitimas': 1, 'cvli_tipo': 'Homicídio', 'meio': ('Arma de fogo' if re.search(r'ARMA DE FOGO|DISPARO|TIRO|PAF\b', normal(piece)) else 'Arma branca' if re.search(r'FACA|FACAO|ARMA BRANCA|PEIXEIRA', normal(piece)) else 'Não informado')} if crime_type(m.group(1)) == 'homicidio' else {}),
             'notes': '', 'source': 'PDF (revisado pelo administrador)', 'warnings': warnings
         })
     if not rows:
@@ -439,6 +460,7 @@ def validate_record(d):
     for k, mx, required in [('cia',90,True),('city',100,True),('neighborhood',100,False),('location',350,False),('ref',90,False),('kind',120,False),('notes',750,False),('source',120,False)]:
         r[k] = clean_text(d.get(k), mx, k, required)
     r['neighborhood'] = norm_bairro(r['neighborhood'])
+    r['city'] = norm_city(r['city']) or r['city']
     grupo = clean_text(d.get('grupo'), 20, 'grupo')
     r['grupo'] = grupo if grupo in GROUPS else auto_group(r['kind'])
     # Coordenada exata da ocorrência (opcional; visível só ao administrador)
@@ -456,6 +478,17 @@ def validate_record(d):
     cls=clean_text(d.get('crime_category',crime_type(r['kind'])),30,'classificação') or 'outros'
     if cls not in ('outros','homicidio','tentativa_homicidio'):raise ValueError('Classificação de crime inválida.')
     r['crime_category']=cls
+    # Homicídio (CVLI): nº de vítimas, tipo e meio empregado
+    try: vit = int(d.get('vitimas') or 0)
+    except (TypeError, ValueError): raise ValueError('Número de vítimas inválido.')
+    if isinstance(d.get('vitimas'), bool) or not 0 <= vit <= 50: raise ValueError('Número de vítimas inválido.')
+    tipo, meio = clean_text(d.get('cvli_tipo'), 40, 'tipo de CVLI'), clean_text(d.get('meio'), 30, 'meio empregado')
+    if tipo and tipo not in CVLI_TYPES: raise ValueError('Tipo de CVLI inválido.')
+    if meio and meio not in CVLI_MEANS: raise ValueError('Meio empregado inválido.')
+    if cls == 'homicidio':
+        r['vitimas'], r['cvli_tipo'], r['meio'] = max(vit, 1), tipo or 'Homicídio', meio or 'Não informado'
+    else:
+        r['vitimas'], r['cvli_tipo'], r['meio'] = (vit if cls == 'tentativa_homicidio' else 0), '', meio if cls == 'tentativa_homicidio' else ''
     for k in COUNT_FIELDS:
         n = d.get(k, 0)
         if isinstance(n, bool): raise ValueError('Indicadores devem ser inteiros.')
@@ -494,8 +527,50 @@ def record_from_row(row, private=False):
     d['drugs'] = json.loads(d.pop('drugs'))
     d['guns'] = json.loads(d.pop('guns'))
     d['neighborhood'] = norm_bairro(d.get('neighborhood'))
+    d['city'] = norm_city(d.get('city')) or d.get('city', '')
+    if d.get('crime_category') == 'homicidio' and not d.get('vitimas'): d['vitimas'] = 1
     d['grupo'] = d.get('grupo') if d.get('grupo') in GROUPS else auto_group(d.get('kind', ''))
     if not private:
         for k in ('location','ref','notes','source','created_at','updated_at','lat','lon','created_by','updated_by'):
             d.pop(k, None)
     return d
+
+
+MONTH_COLS = {'JAN': 1, 'FEV': 2, 'MAR': 3, 'ABR': 4, 'MAI': 5, 'JUN': 6, 'JUL': 7, 'AGO': 8, 'SET': 9, 'OUT': 10, 'NOV': 11, 'DEZ': 12}
+
+
+def parse_cvli_xlsx(data: bytes):
+    """Lê a planilha "CVLI por município" (blocos "ANO 2023", linha MUNICÍPIO | JAN ... DEZ) -> [{year, month, municipio, total}]."""
+    try:
+        import openpyxl
+    except ImportError as e:
+        raise ValueError('Biblioteca openpyxl não instalada.') from e
+    import io
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(data), data_only=True, read_only=True)
+    except Exception as e:
+        raise ValueError('Não foi possível ler a planilha (.xlsx).') from e
+    out = {}
+    for ws in wb.worksheets:
+        year, cols = None, None
+        for row in ws.iter_rows(values_only=True):
+            cells = ['' if c is None else c for c in row]
+            first = normal(str(cells[0])) if cells else ''
+            m = re.fullmatch(r'ANO\s+(20\d{2})', first)
+            if m: year, cols = int(m.group(1)), None; continue
+            if first.startswith('MUNICIPIO') and year:
+                cols = {i: MONTH_COLS[normal(str(c))] for i, c in enumerate(cells) if normal(str(c)) in MONTH_COLS}
+                continue
+            if not (year and cols) or not first or first.startswith('TOTAL'):
+                if first.startswith('TOTAL'): cols = None if first.startswith('TOTAL DO ANO') else cols
+                continue
+            city = norm_city(cells[0])
+            for i, mon in cols.items():
+                v = cells[i] if i < len(cells) else 0
+                try: n = int(float(v or 0))
+                except (TypeError, ValueError): continue
+                if not 0 <= n <= 500: raise ValueError(f'Valor inválido na planilha: {city} {mon}/{year} = {v}.')
+                out[(year, mon, city)] = n
+    if not out:
+        raise ValueError('Não encontrei os blocos "ANO 2023 / MUNICÍPIO / JAN ... DEZ" na planilha.')
+    return [{'year': y, 'month': mo, 'municipio': c, 'total': n} for (y, mo, c), n in sorted(out.items())]

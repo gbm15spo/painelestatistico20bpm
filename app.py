@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
 from werkzeug.exceptions import HTTPException
-from core import validate_record, record_from_row, pdf_preview, COUNT_FIELDS, norm_bairro, bairro_key, canon_bairros
+from core import validate_record, record_from_row, pdf_preview, COUNT_FIELDS, norm_bairro, bairro_key, canon_bairros, norm_city, parse_cvli_xlsx
 
 HERE = Path(__file__).resolve().parent
 app = Flask(__name__, static_folder=None)
@@ -74,6 +74,7 @@ def _initialize_once():
           tco INTEGER NOT NULL DEFAULT 0, mandados INTEGER NOT NULL DEFAULT 0, veiculos INTEGER NOT NULL DEFAULT 0,
           armas_brancas INTEGER NOT NULL DEFAULT 0, simulacros INTEGER NOT NULL DEFAULT 0, adolescentes INTEGER NOT NULL DEFAULT 0,
           conduzidos INTEGER NOT NULL DEFAULT 0, presos INTEGER NOT NULL DEFAULT 0, grupo TEXT NOT NULL DEFAULT '',
+          vitimas INTEGER NOT NULL DEFAULT 0, cvli_tipo TEXT NOT NULL DEFAULT '', meio TEXT NOT NULL DEFAULT '',
           created_by TEXT NOT NULL DEFAULT '', updated_by TEXT NOT NULL DEFAULT '',
           drugs TEXT NOT NULL DEFAULT '[]', guns TEXT NOT NULL DEFAULT '[]', notes TEXT NOT NULL DEFAULT '',
           source TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -81,9 +82,9 @@ def _initialize_once():
         cols={x[0] for x in c.execute(text("SELECT * FROM records WHERE 1=0")).cursor.description}
         for col in ('lat','lon'):
             if col not in cols:c.execute(text(f'ALTER TABLE records ADD COLUMN {col} DOUBLE PRECISION'))
-        for col in ('grupo','created_by','updated_by'):
+        for col in ('grupo','created_by','updated_by','cvli_tipo','meio'):
             if col not in cols:c.execute(text(f"ALTER TABLE records ADD COLUMN {col} TEXT NOT NULL DEFAULT ''"))
-        for col in ('armas_brancas','simulacros','adolescentes','conduzidos','presos'):
+        for col in ('armas_brancas','simulacros','adolescentes','conduzidos','presos','vitimas'):
             if col not in cols:c.execute(text(f'ALTER TABLE records ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0'))
         if 'conduzidos' not in cols:  # ocorrências antigas: ao menos 1 pessoa por condução/flagrante registrado
             c.execute(text('UPDATE records SET conduzidos=conducoes WHERE conduzidos=0 AND conducoes>0'))
@@ -101,6 +102,19 @@ def _initialize_once():
           lat DOUBLE PRECISION NOT NULL, lon DOUBLE PRECISION NOT NULL,
           PRIMARY KEY(city, neighborhood)
         )'''))
+        c.execute(text('''CREATE TABLE IF NOT EXISTS cvli_monthly (
+          year INTEGER NOT NULL, month INTEGER NOT NULL, municipio TEXT NOT NULL, total INTEGER NOT NULL,
+          source TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL DEFAULT '', PRIMARY KEY(year, month, municipio)
+        )'''))
+        if not c.execute(text('SELECT 1 FROM cvli_monthly LIMIT 1')).fetchone():
+            # primeira carga: planilha "Relatório geral de CVLI" (2023–2026) que acompanha o projeto
+            try:
+                seed=json.loads((HERE/'cvli_seed.json').read_text(encoding='utf-8'))
+                for row in seed['rows']:
+                    c.execute(text('INSERT INTO cvli_monthly(year,month,municipio,total,source,updated_at) VALUES(:year,:month,:municipio,:total,:src,:t)'),
+                              {**row,'src':seed.get('source',''),'t':dt.datetime.now(dt.timezone.utc).isoformat()})
+            except FileNotFoundError:
+                pass
         c.execute(text('''CREATE TABLE IF NOT EXISTS users (
           username TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', password_hash TEXT NOT NULL,
           role TEXT NOT NULL DEFAULT 'operador', active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
@@ -159,9 +173,9 @@ def insert_records(records,user=''):
             uid=secrets.token_urlsafe(16)
             params={**r,'id':uid,'created_at':now,'updated_at':now,'created_by':user,'updated_by':user,'drugs':json.dumps(r['drugs'],ensure_ascii=False),'guns':json.dumps(r['guns'],ensure_ascii=False)}
             c.execute(text('''INSERT INTO records(id,date,time,cia,city,neighborhood,location,ref,kind,crime_category,
-               conducoes,flagrantes,tco,mandados,veiculos,armas_brancas,simulacros,adolescentes,conduzidos,presos,grupo,drugs,guns,notes,source,lat,lon,created_by,updated_by,created_at,updated_at)
+               conducoes,flagrantes,tco,mandados,veiculos,armas_brancas,simulacros,adolescentes,conduzidos,presos,grupo,vitimas,cvli_tipo,meio,drugs,guns,notes,source,lat,lon,created_by,updated_by,created_at,updated_at)
                VALUES(:id,:date,:time,:cia,:city,:neighborhood,:location,:ref,:kind,:crime_category,
-               :conducoes,:flagrantes,:tco,:mandados,:veiculos,:armas_brancas,:simulacros,:adolescentes,:conduzidos,:presos,:grupo,:drugs,:guns,:notes,:source,:lat,:lon,:created_by,:updated_by,:created_at,:updated_at)'''),params)
+               :conducoes,:flagrantes,:tco,:mandados,:veiculos,:armas_brancas,:simulacros,:adolescentes,:conduzidos,:presos,:grupo,:vitimas,:cvli_tipo,:meio,:drugs,:guns,:notes,:source,:lat,:lon,:created_by,:updated_by,:created_at,:updated_at)'''),params)
             log(c,user,'Cadastrou ocorrência',rec_label(r),r.get('source',''))
             inserted.append(uid)
     return {'inserted':len(inserted),'skipped':len(skipped),'skipped_refs':skipped}
@@ -319,6 +333,37 @@ def api_geo_resolve():
     except urllib.error.HTTPError as e:final=e.geturl() or url
     except Exception:raise ValueError('Não foi possível abrir o link. Cole a coordenada (ex.: -9.4062, -38.2147).')
     return jsonify({'url':final})
+
+
+@app.get('/api/cvli')
+def api_cvli():
+    # Totais mensais de CVLI por município (planilha consolidada). Dado agregado: público.
+    initialize()
+    with database().connect() as c:
+        rows=c.execute(text('SELECT year,month,municipio,total,source,updated_at FROM cvli_monthly ORDER BY year,month,municipio')).fetchall()
+    rows=[dict(x._mapping) for x in rows]
+    return jsonify({'monthly':[{k:r[k] for k in ('year','month','municipio','total')} for r in rows],
+                    'source':rows[-1]['source'] if rows else '','updated_at':max((r['updated_at'] for r in rows),default='')})
+
+
+@app.post('/api/cvli/import')
+def api_cvli_import():
+    # Nova versão da planilha CVLI: substitui os meses/municípios presentes nela; o resto fica como está.
+    s=admin()
+    if not s:return no_access()
+    raw=request.get_data(cache=False)
+    if len(raw)>8*1024*1024:raise ValueError('Planilha excede 8 MB.')
+    if not raw.startswith(b'PK'):raise ValueError('Envie a planilha em formato .xlsx.')
+    rows=parse_cvli_xlsx(raw)
+    src=str(request.args.get('name','Planilha de homicídios'))[:120]
+    t=now_iso()
+    with database().begin() as c:
+        for r in rows:
+            c.execute(text('''INSERT INTO cvli_monthly(year,month,municipio,total,source,updated_at) VALUES(:year,:month,:municipio,:total,:src,:t)
+              ON CONFLICT(year,month,municipio) DO UPDATE SET total=excluded.total,source=excluded.source,updated_at=excluded.updated_at'''),{**r,'src':src,'t':t})
+        years=sorted({r['year'] for r in rows})
+        log(c,s['username'],'Importou planilha de homicídios',src,f"{len(rows)} valores mensais; anos {', '.join(map(str,years))}; total {sum(r['total'] for r in rows)}")
+    return jsonify({'ok':True,'rows':len(rows),'years':years,'total':sum(r['total'] for r in rows)})
 
 
 @app.get('/api/geo')
@@ -592,7 +637,7 @@ def api_draft_clear():
 
 FIELD_NAMES={'date':'data','time':'hora','cia':'CIA','city':'cidade','neighborhood':'bairro','location':'endereço','ref':'número','kind':'tipo',
   'crime_category':'classificação','grupo':'grupo','conducoes':'conduções','flagrantes':'flagrantes','tco':'TCO','mandados':'mandados','veiculos':'veículos',
-  'armas_brancas':'armas brancas','simulacros':'simulacros','adolescentes':'adolescentes','conduzidos':'pessoas conduzidas','presos':'pessoas presas',
+  'armas_brancas':'armas brancas','simulacros':'simulacros','adolescentes':'adolescentes','conduzidos':'pessoas conduzidas','presos':'pessoas presas','vitimas':'vítimas','cvli_tipo':'tipo de CVLI','meio':'meio empregado',
   'drugs':'drogas','guns':'armas de fogo','notes':'observações','source':'origem','lat':'latitude','lon':'longitude'}
 
 
@@ -612,6 +657,7 @@ def api_record_edit(uid):
           neighborhood=:neighborhood,location=:location,ref=:ref,kind=:kind,crime_category=:crime_category,
           conducoes=:conducoes,flagrantes=:flagrantes,tco=:tco,mandados=:mandados,veiculos=:veiculos,
           armas_brancas=:armas_brancas,simulacros=:simulacros,adolescentes=:adolescentes,conduzidos=:conduzidos,presos=:presos,grupo=:grupo,
+          vitimas=:vitimas,cvli_tipo=:cvli_tipo,meio=:meio,
           drugs=:drugs,guns=:guns,notes=:notes,source=:source,lat=:lat,lon=:lon,updated_at=:updated_at,updated_by=:updated_by WHERE id=:id'''),r)
         log(c,s['username'],'Editou ocorrência',rec_label(r),'; '.join(diff) or 'sem alterações')
     return jsonify({'ok':True})

@@ -41,7 +41,7 @@ def build_xlsx(records):
     rows=[['Data','Horário','Número','Tipo','Classificação','CIA','Cidade','Bairro','Endereço / local','Conduções','Flagrantes','TCO','Mandados','Veículos recuperados','Armas brancas apreendidas','Simulacros apreendidos','Adolescentes apreendidos','Pessoas conduzidas','Pessoas presas em flagrante','Drogas detalhadas','Armas de fogo detalhadas','Observações','Origem','Grupo','Cadastrado por','Alterado por']]
     drugs=[['Data','Ocorrência','CIA','Cidade','Bairro','Droga','Quantidade','Unidade']]
     guns=[['Data','Ocorrência','CIA','Cidade','Bairro','Arma','Quantidade']]
-    crimes=[['Data','Horário','Número','Crime','CIA','Cidade','Bairro','Local','Observações']]
+    crimes=[['Data','Horário','Número','Crime','Tipo de homicídio','Vítimas','Meio empregado','CIA','Cidade','Bairro','Local','Observações']]
     cia_city=defaultdict(lambda:Counter())
     month=defaultdict(lambda:Counter())
     years=defaultdict(lambda:Counter())
@@ -54,7 +54,7 @@ def build_xlsx(records):
         for d in r.get('drugs',[]):drugs.append([r.get('date',''),r.get('ref',''),r.get('cia',''),r.get('city',''),r.get('neighborhood',''),d.get('type',''),d.get('qty',0),d.get('unit','')])
         for g in r.get('guns',[]):guns.append([r.get('date',''),r.get('ref',''),r.get('cia',''),r.get('city',''),r.get('neighborhood',''),g.get('type',''),g.get('qty',0)])
         if cls in ('homicidio','tentativa_homicidio'):
-            crimes.append([r.get('date',''),r.get('time',''),r.get('ref',''),label,r.get('cia',''),r.get('city',''),r.get('neighborhood',''),r.get('location',''),r.get('notes','')])
+            crimes.append([r.get('date',''),r.get('time',''),r.get('ref',''),label,r.get('cvli_tipo',''),int(r.get('vitimas',0) or 0),r.get('meio',''),r.get('cia',''),r.get('city',''),r.get('neighborhood',''),r.get('location',''),r.get('notes','')])
         for key in ((r.get('cia',''),r.get('city','')),r.get('date','')[:7],r.get('date','')[:4],(r.get('city',''),r.get('neighborhood',''))):pass
         counters=[cia_city[(r.get('cia',''),r.get('city',''))],month[r.get('date','')[:7]],years[r.get('date','')[:4]],neighborhoods[(r.get('city',''),r.get('neighborhood',''))]]
         for c in counters:

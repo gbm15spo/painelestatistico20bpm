@@ -266,6 +266,24 @@ dialog h2{margin-bottom:14px}
 #bFrom{flex:1 1 220px;width:auto}#bTo{flex:1 1 220px;width:auto}
 #auditSearch{max-width:340px}
 .top .btn.sm{font-size:.8rem}
+
+/* Homicídios */
+.tabs button.hot-tab{color:#a3261c}
+.tabs button.hot-tab.on{color:#a3261c;border-bottom-color:#a3261c}
+.hom-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#1b1913;color:#fff;border-left:6px solid #a3261c;border-radius:var(--radius);padding:14px 18px;margin-bottom:14px}
+.hom-banner h2{margin:0;font-size:1.25rem;color:#fff}.hom-banner p{margin:4px 0 0;color:#c3b091;font-size:.88rem}
+.hom-banner .btn{background:#c3b091;border-color:#c3b091;color:#14130f}
+.kpi.hk b{color:#a3261c}
+.hom-sum .rep-text{font-size:1rem}
+#tab-homicidios .filters{grid-template-columns:repeat(6,minmax(0,1fr))}
+.gbars.short{height:170px}
+.gb.hl .c{background:#a3261c}
+#tab-homicidios .gb .c{background:#3a3424}#tab-homicidios .gb.hl .c{background:#a3261c}#tab-homicidios .gb .p{background:#d6ccb0}
+#tab-homicidios .hbars .b{background:#a3261c}
+td.site{background:#fbeaea;font-weight:700}
+.print-only{display:none}
+@media (max-width:860px){#tab-homicidios .filters{grid-template-columns:1fr 1fr}}
+@media print{.print-only{display:block}#tab-homicidios .card{break-inside:avoid;border:1px solid #ddd5c2;box-shadow:none}#tab-homicidios .charts{grid-template-columns:1fr 1fr}}
 </style>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha256-65UqrlgGoRAnKfKRuriH3eeDrOhZgZo1SCenduc+SGo=" crossorigin="" defer></script>
@@ -287,8 +305,9 @@ dialog h2{margin-bottom:14px}
   </div>
 </header>
 
-<nav id="tabs" class="tabs hidden" aria-label="Seções administrativas">
-  <button type="button" data-tab="painel" class="on">Painel</button>
+<nav id="tabs" class="tabs" aria-label="Seções do site">
+  <button type="button" data-tab="painel" class="on" data-pub>Painel</button>
+  <button type="button" data-tab="homicidios" class="hot-tab" data-pub>Homicídios</button>
   <button type="button" data-tab="cadastro">Cadastrar</button>
   <button type="button" data-tab="pdf">Importar PDF</button>
   <button type="button" data-tab="registros">Registros</button>
@@ -337,6 +356,48 @@ dialog h2{margin-bottom:14px}
       <div class="card span2"><h2>Mapa de ocorrências por bairro</h2><p class="muted small">Cada cor é um indicador e o número é a quantidade no bairro; em cinza, as demais ocorrências. Clique (ou toque) num círculo para ver os tipos de ocorrência dali.</p><div id="map"></div><div id="mapLegend" class="map-legend"></div><div id="mapInfo" class="small"></div></div>
       <div class="card"><h2>Drogas apreendidas</h2><div id="tbDrugs"></div></div>
       <div class="card"><h2>Armas de fogo apreendidas</h2><div id="tbGuns"></div></div>
+    </div>
+  </section>
+
+  <!-- HOMICÍDIOS -->
+  <section id="tab-homicidios" class="tab">
+    <div class="hom-banner noprint">
+      <div><h2>Homicídios</h2><p>Homicídios na área do 20º BPM: planilha consolidada desde 2023 + casos lançados no site.</p></div>
+      <button type="button" class="btn" id="hPrint" data-auth>Imprimir / Salvar em PDF</button>
+    </div>
+    <div class="card filters noprint">
+      <label>Período<select id="hPer"><option value="mes">Mês</option><option value="trimestre">Trimestre</option><option value="ano" selected>Ano</option><option value="tudo">Tudo (2023 em diante)</option></select></label>
+      <label>Ano<select id="hYear"></select></label>
+      <label>Trimestre<select id="hQ"><option value="0">1º trimestre (jan–mar)</option><option value="1">2º trimestre (abr–jun)</option><option value="2">3º trimestre (jul–set)</option><option value="3">4º trimestre (out–dez)</option></select></label>
+      <label>Mês<select id="hMonth"><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></label>
+      <label>Município<select id="hCity"></select></label>
+      <label>Bairro<select id="hNb"></select></label>
+    </div>
+    <div id="hPrintHead" class="print-only"></div>
+    <div class="card hom-sum"><p id="hText" class="rep-text"></p><p id="hNote" class="muted small"></p></div>
+    <div id="hKpis" class="kpis"></div>
+    <div class="charts">
+      <div class="card span2"><h2 id="hMonthsT">Vítimas por mês</h2><div id="hMonths" class="gbars"></div><p class="legend"><i class="c"></i>Ano escolhido<i class="p"></i>Ano anterior · coluna destacada = período do filtro</p></div>
+      <div class="card"><h2>Comparativo anual</h2><div id="hYears" class="gbars short"></div><p id="hYearsNote" class="muted small"></p></div>
+      <div class="card"><h2>Por município</h2><div id="hCities" class="hbars"></div></div>
+      <div class="card"><h2>Por bairro <span class="muted small">(casos lançados no site)</span></h2><div id="hNbs" class="hbars"></div></div>
+      <div class="card"><h2>Meio empregado</h2><div id="hMeans" class="hbars"></div></div>
+      <div class="card"><h2>Tipo</h2><div id="hTypes" class="hbars"></div></div>
+      <div class="card"><h2>Por CIA</h2><div id="hCias" class="hbars"></div></div>
+      <div class="card"><h2>Dia da semana</h2><div id="hWeek" class="hbars"></div></div>
+      <div class="card"><h2>Faixa de horário</h2><div id="hHours" class="hbars"></div></div>
+      <div class="card span2"><h2 id="hTableT">Vítimas por município e mês</h2><div id="hTable" class="table-wrap"></div></div>
+      <div class="card span2"><h2 id="hCasesT">Casos lançados no site</h2><div id="hCases" class="table-wrap"></div></div>
+    </div>
+    <form id="formHom" class="card editor noprint hidden" data-auth novalidate>
+      <div class="card-h"><h2>Registrar homicídio</h2><span class="muted small">Entra também no painel geral, nos relatórios e no mapa.</span></div>
+      <div class="ed-body"></div>
+      <div class="actions"><button type="submit" class="btn primary">Salvar homicídio</button></div>
+    </form>
+    <div class="card noprint hidden" data-auth>
+      <h2>Atualizar planilha de homicídios</h2>
+      <p class="muted">Envie uma nova versão da planilha de homicídios (.xlsx, no mesmo formato). Os meses e municípios que estiverem na planilha substituem os anteriores.</p>
+      <div class="row-inline"><input type="file" id="cvliFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><button type="button" id="btnCvli" class="btn primary">Importar planilha</button></div>
     </div>
   </section>
 
@@ -565,6 +626,8 @@ const S = { admin: false, csrf: null, user: null, role: null, name: null, master
 const CATS = { outros: 'Outros', homicidio: 'Homicídio', tentativa_homicidio: 'Tentativa de homicídio' };
 const IND = [['conducoes','Conduções'],['flagrantes','Flagrantes'],['tco','TCO'],['mandados','Mandados'],['veiculos','Veículos recuperados'],['armas_brancas','Armas brancas apreendidas'],['simulacros','Simulacros apreendidos'],['adolescentes','Adolescentes apreendidos'],['conduzidos','Pessoas conduzidas'],['presos','Pessoas presas em flagrante']];
 const GRP = { policial: 'Ocorrência policial', social: 'Atendimento social / apoio' };
+const CVLI_TYPES = ['Homicídio', 'Feminicídio', 'Latrocínio', 'Lesão corporal seguida de morte'];
+const CVLI_MEANS = ['Arma de fogo', 'Arma branca', 'Outro meio', 'Não informado'];
 const IND_SHORT = { conducoes: 'Cond.', flagrantes: 'Flag.', tco: 'TCO', mandados: 'Mand.', veiculos: 'Veíc.', armas_brancas: 'A. br.', simulacros: 'Simul.', adolescentes: 'Adol.', conduzidos: 'P. cond.', presos: 'Presos' };
 const indHead = () => IND.map(([k, l]) => `<th class="n" title="${l}">${IND_SHORT[k]}</th>`).join('');
 const UNITS = ['g','kg','porções','unidades','comprimidos','ml','L','pés'];
@@ -612,8 +675,9 @@ function renderSession() {
   $('#who').textContent = S.admin ? `${S.name || S.user} · ${S.role === 'admin' ? 'Administrador' : 'Operador'}` : '';
   $$('[data-role=admin]').forEach(e => e.classList.toggle('hidden', S.role !== 'admin'));
   $('#btnPass').classList.toggle('hidden', !S.admin || S.master);
-  $('#tabs').classList.toggle('hidden', !S.admin);
-  if (!S.admin) showTab('painel');
+  $$('#tabs button').forEach(b => { if (!b.hasAttribute('data-pub') && !b.dataset.role) b.classList.toggle('hidden', !S.admin); });
+  $$('[data-auth]').forEach(e => e.classList.toggle('hidden', !S.admin));
+  if (!S.admin && !['painel', 'homicidios'].includes(($('#tabs button.on') || {}).dataset?.tab)) showTab('painel');
 }
 function showTab(name) {
   $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
@@ -624,6 +688,7 @@ function showTab(name) {
   if (name === 'usuarios') loadUsers();
   if (name === 'auditoria') loadAudit();
   if (name === 'painel') { if (map) map.invalidateSize(); renderDashboard(); }
+  if (name === 'homicidios') renderHom();
 }
 
 async function loadRecords() {
@@ -634,8 +699,8 @@ async function loadRecords() {
     S.records = [];
     notify(e.message, 'error');
   }
-  await loadGeo(); buildKinds();
-  renderLists(); renderFilters(); renderDashboard();
+  await loadGeo(); await loadCvli(); buildKinds();
+  renderLists(); renderFilters(); renderDashboard(); renderHom();
   if (S.admin) { renderTable(); renderReport(); renderProd(); fillBairroTool(); }
 }
 
@@ -950,6 +1015,11 @@ function editorHTML(r = {}) {
     <label>Classificação<select name="crime_category">${Object.entries(CATS).map(([k, l]) => `<option value="${k}"${(r.crime_category || 'outros') === k ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
     <label class="wide">Tipo / natureza<input name="kind" maxlength="120" placeholder="Ex.: Tráfico de drogas" value="${v('kind')}"></label>
   </div>
+  <div class="grid hom-box${['homicidio', 'tentativa_homicidio'].includes(r.crime_category) ? '' : ' hidden'}">
+    <label>Nº de vítimas<input type="number" name="vitimas" min="0" max="50" step="1" value="${+r.vitimas || (r.crime_category === 'homicidio' ? 1 : 0)}"></label>
+    <label>Tipo de homicídio<select name="cvli_tipo">${['', ...CVLI_TYPES].map(t => `<option value="${t}"${(r.cvli_tipo || (r.crime_category === 'homicidio' ? 'Homicídio' : '')) === t ? ' selected' : ''}>${t || '—'}</option>`).join('')}</select></label>
+    <label>Meio empregado<select name="meio">${['', ...CVLI_MEANS].map(t => `<option value="${t}"${(r.meio || '') === t ? ' selected' : ''}>${t || '—'}</option>`).join('')}</select></label>
+  </div>
   <div class="grid ind">${IND.map(([k, l]) => `<label>${l}<input type="number" min="0" max="100000" step="1" name="${k}" value="${+r[k] || 0}"></label>`).join('')}</div>
   <div class="seiz"><div class="seiz-h"><strong>Drogas apreendidas</strong><button type="button" class="btn sm" data-add="drug">+ Droga</button></div>
     <div class="list drugs">${(r.drugs || []).map(drugRow).join('')}</div></div>
@@ -965,6 +1035,7 @@ function readEditor(root) {
   const rec = {};
   ['date','time','ref','cia','city','neighborhood','location','kind','crime_category','grupo','notes','source'].forEach(k => rec[k] = g(k));
   IND.forEach(([k]) => { const n = parseInt(g(k), 10); rec[k] = Number.isFinite(n) && n > 0 ? n : 0; });
+  rec.vitimas = Math.max(0, parseInt(g('vitimas'), 10) || 0); rec.cvli_tipo = g('cvli_tipo'); rec.meio = g('meio');
   const gv = g('geo'), c = parseCoords(gv);
   rec.lat = c ? c[0] : null; rec.lon = c ? c[1] : null; rec._geoBad = !!gv && !c;
   rec.drugs = $$('.drugs .srow', root).map(row => ({ type: $('[data-f=type]', row).value.trim(), qty: parseFloat($('[data-f=qty]', row).value), unit: $('[data-f=unit]', row).value }))
@@ -1470,6 +1541,157 @@ async function renameBairro(ev) {
   catch (e) { notify(e.message, 'error'); }
 }
 
+/* ---------- Homicídios ---------- */
+// Duas fontes: a planilha consolidada (totais por município e mês, sem bairro) e os casos lançados no site (com bairro).
+// No mesmo mês e município vale o MAIOR número das duas, para não contar o mesmo caso duas vezes.
+const QLAB = ['1º trimestre (jan–mar)', '2º trimestre (abr–jun)', '3º trimestre (jul–set)', '4º trimestre (out–dez)'];
+const MESL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+async function loadCvli() {
+  try { const j = await api('/api/cvli'); S.cvli = j.monthly || []; S.cvliSrc = j; } catch (_) { S.cvli = []; }
+}
+const homCases = () => S.records.filter(r => r.crime_category === 'homicidio');
+const vit = r => Math.max(1, +r.vitimas || 1);
+const ymKey = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
+function homIndex(nb) {
+  // planilha[ym|cidade] e site[ym|cidade] (site já filtrado por bairro, se houver)
+  const P = new Map(), Q = new Map();
+  S.cvli.forEach(x => P.set(ymKey(x.year, x.month) + '|' + x.municipio, x.total));
+  homCases().filter(r => !nb || r.neighborhood === nb).forEach(r => { const k = r.date.slice(0, 7) + '|' + r.city; Q.set(k, (Q.get(k) || 0) + vit(r)); });
+  return { P, Q };
+}
+function homValue(I, ym, city, nb) {
+  const k = ym + '|' + city, p = I.P.get(k), q = I.Q.get(k) || 0;
+  return nb ? q : Math.max(p || 0, q);
+}
+function homFirstMonth() { const all = [...S.cvli.map(x => ymKey(x.year, x.month)), ...homCases().map(r => r.date.slice(0, 7))].sort(); return all[0] || '0000-00'; }
+function homCities() { return uniq([...S.cvli.map(x => x.municipio), ...homCases().map(r => r.city)]); }
+function homYears() {
+  const ys = new Set([...S.cvli.map(x => x.year), ...homCases().map(r => +r.date.slice(0, 4))]);
+  ys.add(+today().slice(0, 4)); return [...ys].sort((a, b) => a - b);
+}
+function homPeriod() {
+  const per = $('#hPer').value, y = +$('#hYear').value, q = +$('#hQ').value, mo = +$('#hMonth').value;
+  const cur = today().slice(0, 7);
+  let months = [];
+  if (per === 'mes') months = [ymKey(y, mo)];
+  else if (per === 'trimestre') months = [1, 2, 3].map(i => ymKey(y, q * 3 + i));
+  else if (per === 'ano') months = Array.from({ length: 12 }, (_, i) => ymKey(y, i + 1));
+  else { const ys = homYears(); ys.forEach(yy => { for (let i = 1; i <= 12; i++) months.push(ymKey(yy, i)); }); }
+  months = months.filter(m => m <= cur);
+  // período anterior equivalente (no ano em curso, compara só até o mesmo mês)
+  const shift = (ym, n) => { let [yy, mm] = ym.split('-').map(Number); mm -= n; while (mm < 1) { mm += 12; yy--; } return ymKey(yy, mm); };
+  const prev = per === 'tudo' ? [] : months.map(m => shift(m, per === 'mes' ? 1 : per === 'trimestre' ? 3 : 12));
+  const label = per === 'mes' ? `${MESL[mo - 1]} de ${y}` : per === 'trimestre' ? `${QLAB[q]} de ${y}` : per === 'ano' ? `Ano de ${y}` : 'Todo o período';
+  const plabel = !prev.length ? '' : per === 'mes' ? `${MESL[+prev[0].slice(5) - 1]} de ${prev[0].slice(0, 4)}` : per === 'trimestre' ? `${QLAB[(q + 3) % 4]} de ${prev[0].slice(0, 4)}` : `${y - 1}${months.length < 12 ? ` (jan–${MESES[months.length - 1]})` : ''}`;
+  return { per, y, months, prev, label, plabel, partial: per !== 'tudo' && months.length < (per === 'ano' ? 12 : per === 'trimestre' ? 3 : 1) };
+}
+function fillHomFilters() {
+  const ys = homYears(), keep = (sel, opts) => { const v = sel.value; sel.innerHTML = opts; if ([...sel.options].some(o => o.value === v)) sel.value = v; };
+  keep($('#hYear'), ys.map(y => `<option>${y}</option>`).join(''));
+  if (!$('#hYear').dataset.init) { $('#hYear').value = String(ys[ys.length - 1]); $('#hMonth').value = String(+today().slice(5, 7)); $('#hQ').value = String(Math.floor((+today().slice(5, 7) - 1) / 3)); $('#hYear').dataset.init = 1; }
+  keep($('#hCity'), '<option value="">Todos os municípios</option>' + homCities().map(c => `<option>${esc(c)}</option>`).join(''));
+  const city = $('#hCity').value;
+  keep($('#hNb'), '<option value="">Todos os bairros</option>' + uniq(homCases().filter(r => !city || r.city === city).map(r => r.neighborhood)).map(b => `<option>${esc(b)}</option>`).join(''));
+  const per = $('#hPer').value;
+  $('#hQ').closest('label').classList.toggle('hidden', per !== 'trimestre');
+  $('#hMonth').closest('label').classList.toggle('hidden', per !== 'mes');
+  $('#hYear').closest('label').classList.toggle('hidden', per === 'tudo');
+}
+function vbarsPair(box, labels, cur, prev, hl) {
+  const top = Math.max(1, ...cur, ...(prev || []));
+  box.innerHTML = labels.map((l, i) => `<div class="gb${hl && hl[i] ? ' hl' : ''}"><span class="v">${cur[i] || ''}</span><div class="pair">${prev ? '<span class="p"></span>' : ''}<span class="c"></span></div><span class="l">${esc(l)}</span></div>`).join('');
+  $$('.gb', box).forEach((g, i) => { $('.c', g).style.height = (cur[i] / top * 100) + '%'; if (prev) $('.p', g).style.height = (prev[i] / top * 100) + '%'; });
+}
+function renderHom() {
+  if (!$('#tab-homicidios')) return;
+  fillHomFilters();
+  const P = homPeriod(), city = $('#hCity').value, nb = $('#hNb').value, I = homIndex(nb);
+  const cities = city ? [city] : homCities();
+  const sumMonths = ms => ms.reduce((a, ym) => a + cities.reduce((b, c) => b + homValue(I, ym, c, nb), 0), 0);
+  const first = homFirstMonth(), total = sumMonths(P.months), prevTotal = P.prev.length && P.prev[0] >= first ? sumMonths(P.prev) : null;
+  const inPer = r => P.months.includes(r.date.slice(0, 7)) && (!city || r.city === city) && (!nb || r.neighborhood === nb);
+  const cases = homCases().filter(inPer).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  const siteVict = cases.reduce((a, r) => a + vit(r), 0);
+  const scope = nb ? `${nb}${city ? ', ' + city : ''}` : city || 'toda a área do 20º BPM';
+  // texto
+  let txt = `${P.label}${P.partial ? ' (até agora)' : ''}: ${pl(total, 'vítima de homicídio', 'vítimas de homicídio')} em ${scope}`;
+  if (prevTotal !== null) txt += prevTotal ? `; ${total === prevTotal ? 'mesmo número de' : total > prevTotal ? `aumento de ${pct((total - prevTotal) / prevTotal * 100)} em relação a` : `redução de ${pct((prevTotal - total) / prevTotal * 100)} em relação a`} ${P.plabel} (${fmtN(prevTotal)})` : `; ${P.plabel} não teve registro`;
+  txt += '.';
+  if (!city && !nb && total) { const top = topOf(cities.map(c => [c, P.months.reduce((a, ym) => a + homValue(I, ym, c, ''), 0)])); if (top && top[1]) txt += ` ${top[0]} concentra ${fmtN(top[1])} (${pct(top[1] / total * 100)}).`; }
+  if (cases.length) { const b = topOf(countBy(cases.filter(r => r.neighborhood), r => r.neighborhood + (city ? '' : ', ' + r.city))); if (b) txt += ` Bairro com mais casos lançados no site: ${b[0]} (${pl(b[1], 'caso', 'casos')}).`; }
+  $('#hText').textContent = txt;
+  $('#hNote').textContent = nb ? 'Com bairro escolhido, a contagem usa só os casos lançados no site (a planilha não tem bairro).'
+    : `Fontes: ${!S.cvliSrc || !S.cvliSrc.source ? 'planilha de homicídios' : /^planilha/i.test(S.cvliSrc.source) ? S.cvliSrc.source : `planilha de homicídios (${S.cvliSrc.source})`} + casos lançados no site. No mesmo mês e município vale o maior número das duas, para não contar o mesmo caso duas vezes.`;
+  // KPIs
+  const [vc, vt] = prevTotal === null ? ['', ''] : variation(total, prevTotal);
+  const nMonths = P.months.length || 1;
+  const kp = [[fmtN(total), 'Vítimas no período', vt ? `<em class="${vc}">${vt}</em>` : ''], [prevTotal === null ? '–' : fmtN(prevTotal), P.plabel ? 'Período anterior: ' + P.plabel : 'Período anterior', ''],
+    [(total / nMonths).toLocaleString('pt-BR', { maximumFractionDigits: 1 }), 'Média por mês', ''], [fmtN(cases.length), 'Casos lançados no site (com bairro)', siteVict !== cases.length ? `<em class="eq">${fmtN(siteVict)} vítimas</em>` : '']];
+  $('#hKpis').innerHTML = kp.map(([v, l, e]) => `<div class="kpi hk"><b>${v}</b><span>${esc(l)}</span>${e}</div>`).join('');
+  // evolução mensal do ano (com o ano anterior)
+  const y = P.per === 'tudo' ? homYears().slice(-1)[0] : P.y, cur = today().slice(0, 7);
+  const ms = Array.from({ length: 12 }, (_, i) => ymKey(y, i + 1)), pms = Array.from({ length: 12 }, (_, i) => ymKey(y - 1, i + 1));
+  vbarsPair($('#hMonths'), MESES, ms.map(m => m <= cur ? sumMonths([m]) : 0), pms.map(m => sumMonths([m])), ms.map(m => P.months.includes(m)));
+  $('#hMonthsT').textContent = `Vítimas por mês — ${y} (escuro) × ${y - 1} (claro)`;
+  // comparativo anual
+  const ys = homYears(), lastM = +cur.slice(5);
+  const yt = ys.map(yy => sumMonths(Array.from({ length: 12 }, (_, i) => ymKey(yy, i + 1)).filter(m => m <= cur)));
+  const ytd = ys.map(yy => sumMonths(Array.from({ length: lastM }, (_, i) => ymKey(yy, i + 1))));
+  vbarsPair($('#hYears'), ys.map(String), yt, null, ys.map(yy => yy === y));
+  $('#hYearsNote').textContent = `${ys[ys.length - 1]} ainda em andamento. Comparando só de janeiro a ${MESL[lastM - 1].toLowerCase()}: ${ys.map((yy, i) => `${yy}: ${fmtN(ytd[i])}`).join(' · ')}.`;
+  // por município / bairro / meio / CIA / semana / horário
+  hbars($('#hCities'), homCities().filter(c => !city || c === city).map(c => [c, P.months.reduce((a, ym) => a + homValue(I, ym, c, nb), 0)]), 15);
+  const wsum = (arr, fn) => { const m = new Map(); arr.forEach(r => { const k = fn(r) || 'Não informado'; m.set(k, (m.get(k) || 0) + vit(r)); }); return [...m]; };
+  hbars($('#hNbs'), wsum(cases.filter(r => r.neighborhood), r => r.neighborhood + (city ? '' : ' (' + r.city + ')')), 15);
+  hbars($('#hMeans'), wsum(cases, r => r.meio), 6);
+  hbars($('#hTypes'), wsum(cases, r => r.cvli_tipo || 'Homicídio'), 6);
+  hbars($('#hCias'), wsum(cases, r => r.cia), 10);
+  hbars($('#hWeek'), ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'].map((d, i) => [d, cases.filter(r => new Date(r.date + 'T12:00:00').getDay() === i).reduce((a, r) => a + vit(r), 0)]).filter(x => x[1]), 7);
+  hbars($('#hHours'), [['00h–06h', 0, 6], ['06h–12h', 6, 12], ['12h–18h', 12, 18], ['18h–24h', 18, 24]].map(([l, a, b]) => [l, cases.filter(r => r.time && +r.time.slice(0, 2) >= a && +r.time.slice(0, 2) < b).reduce((s2, r) => s2 + vit(r), 0)]), 4);
+  if (!cases.length) ['#hNbs', '#hMeans', '#hTypes', '#hCias', '#hWeek', '#hHours'].forEach(id => { $(id).innerHTML = '<p class="nodata">Nenhum caso lançado no site neste período (a planilha só tem totais por município).</p>'; });
+  // tabela município × mês do ano
+  const rowsC = homCities().filter(c => !city || c === city);
+  $('#hTableT').textContent = `Vítimas por município e mês — ${y}`;
+  $('#hTable').innerHTML = `<table class="matrix"><thead><tr><th>Município</th>${MESES.map(m => `<th class="n">${m}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>${rowsC.map(c => {
+    const v = ms.map(m => m <= cur ? homValue(I, m, c, nb) : null), t = v.reduce((a, b) => a + (b || 0), 0);
+    return t || !nb ? `<tr><td>${esc(c)}</td>${v.map((x, i) => { const k = ms[i] + '|' + c, site = (I.Q.get(k) || 0) > (I.P.get(k) || 0); return `<td class="n${site ? ' site' : ''}"${site ? ' title="Inclui casos lançados no site além da planilha"' : ''}>${x === null ? '' : x || '–'}</td>`; }).join('')}<td class="n"><strong>${fmtN(t)}</strong></td></tr>` : ''; }).join('')}
+    <tr class="total"><td>Total</td>${ms.map(m => `<td class="n">${m <= cur ? fmtN(sumMonths([m])) : ''}</td>`).join('')}<td class="n">${fmtN(ms.filter(m => m <= cur).reduce((a, m) => a + sumMonths([m]), 0))}</td></tr></tbody></table>
+    <p class="muted small">Células marcadas: o site tem mais casos lançados que a planilha naquele mês.</p>`;
+  // casos lançados
+  $('#hCasesT').textContent = `Casos lançados no site — ${P.label} (${fmtN(cases.length)})`;
+  $('#hCases').innerHTML = cases.length ? `<table><thead><tr><th>Data</th><th>Hora</th>${S.admin ? '<th>Nº</th>' : ''}<th>Município</th><th>Bairro</th><th>CIA</th><th>Tipo</th><th>Meio</th><th class="n">Vítimas</th>${S.admin ? '<th>Local</th><th class="noprint"></th>' : ''}</tr></thead><tbody>${cases.map(r => `<tr data-id="${esc(r.id)}"><td class="nowrap">${fmtD(r.date)}</td><td>${esc(r.time)}</td>${S.admin ? `<td>${esc(r.ref)}</td>` : ''}<td>${esc(r.city)}</td><td>${esc(r.neighborhood)}</td><td>${esc(r.cia)}</td><td>${esc(r.cvli_tipo || 'Homicídio')}</td><td>${esc(r.meio || '')}</td><td class="n">${vit(r)}</td>${S.admin ? `<td class="small">${esc(r.location || '')}</td><td class="noprint"><button type="button" class="btn sm" data-hedit>Editar</button></td>` : ''}</tr>`).join('')}</tbody></table>` : '<p class="nodata">Nenhum caso lançado no site neste período.</p>';
+  // cabeçalho de impressão
+  $('#hPrintHead').innerHTML = repHead('Relatório de Homicídios', `<strong>Período:</strong> ${P.label}${P.plabel ? ` · <strong>Comparação:</strong> ${P.plabel}` : ''}`, [city || 'Todos os municípios', nb ? 'Bairro: ' + nb : ''].filter(Boolean).join(' · '));
+}
+async function saveHom(ev) {
+  ev.preventDefault();
+  const form = $('#formHom'), rec = readEditor(form), err = checkRecord(rec);
+  if (err) return notify(err, 'error');
+  rec.crime_category = 'homicidio'; rec.grupo = 'policial';
+  const btn = $('button[type=submit]', form); btn.disabled = true;
+  try {
+    const j = await api('/api/records', { method: 'POST', body: rec });
+    notify(j.skipped ? `Ocorrência nº ${rec.ref} de ${fmtD(rec.date)} já estava cadastrada — nada foi duplicado.` : 'Homicídio registrado: já aparece na aba Homicídios e no painel geral.', j.skipped ? 'info' : 'ok');
+    mountHomForm(); await loadRecords();
+  } catch (e) { notify(e.message, 'error'); }
+  finally { btn.disabled = false; }
+}
+function mountHomForm() {
+  mountEditor($('#formHom'), { date: today(), crime_category: 'homicidio', kind: 'Homicídio', grupo: 'policial', vitimas: 1, cvli_tipo: 'Homicídio', meio: 'Não informado', source: 'Cadastro manual (aba Homicídios)' });
+}
+async function importCvli() {
+  const f = $('#cvliFile').files[0];
+  if (!f) return notify('Escolha a planilha de homicídios (.xlsx).', 'error');
+  if (!confirm('Atualizar os totais de homicídios com esta planilha? Os meses e municípios que estiverem nela serão substituídos.')) return;
+  const btn = $('#btnCvli'); btn.disabled = true;
+  try {
+    const j = await api('/api/cvli/import?name=' + encodeURIComponent(f.name), { method: 'POST', raw: await f.arrayBuffer(), type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    notify(`Planilha importada: ${j.rows} valores mensais (${j.years.join(', ')}), total de ${j.total} vítimas.`); $('#cvliFile').value = '';
+    await loadCvli(); renderHom();
+  } catch (e) { notify(e.message, 'error'); }
+  finally { btn.disabled = false; }
+}
+
 /* ---------- Backup ---------- */
 async function importBackup() {
   const f = $('#bkFile').files[0];
@@ -1539,6 +1761,12 @@ function bind() {
     if (e.target.closest('[data-remove]')) removeRec(tr.dataset.id);
   });
   $('#btnBk').addEventListener('click', importBackup);
+  ['#hPer', '#hYear', '#hQ', '#hMonth', '#hCity', '#hNb'].forEach(id => $(id).addEventListener('change', () => { if (id === '#hCity') $('#hNb').value = ''; renderHom(); }));
+  $('#hPrint').addEventListener('click', () => window.print());
+  $('#formHom').addEventListener('submit', saveHom);
+  $('#btnCvli').addEventListener('click', importCvli);
+  $('#hCases').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr && e.target.closest('[data-hedit]')) openEdit(tr.dataset.id); });
+  document.addEventListener('change', e => { if (e.target.matches('select[name=crime_category]')) { const box = $('.hom-box', e.target.closest('.editor') || document); if (box) box.classList.toggle('hidden', !['homicidio', 'tentativa_homicidio'].includes(e.target.value)); } });
   $('#formUser').addEventListener('submit', createUser);
   $('#usersBox').addEventListener('click', e => {
     const tr = e.target.closest('tr[data-u]'); if (!tr) return; const u = tr.dataset.u;
@@ -1586,6 +1814,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bind();
   const ic = document.createElement('link'); ic.rel = 'icon'; ic.href = $('.top .logo').src; document.head.appendChild(ic);
   mountEditor($('#formNovo'), { date: today() });
+  mountHomForm();
   await refreshSession();
   await loadRecords();
   if (S.admin) await loadDraft();
