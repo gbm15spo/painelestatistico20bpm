@@ -284,6 +284,30 @@ td.site{background:#fbeaea;font-weight:700}
 .print-only{display:none}
 @media (max-width:860px){#tab-homicidios .filters{grid-template-columns:1fr 1fr}}
 @media print{.print-only{display:block}#tab-homicidios .card{break-inside:avoid;border:1px solid #ddd5c2;box-shadow:none}#tab-homicidios .charts{grid-template-columns:1fr 1fr}}
+
+/* Painel comparativo (homicídios) */
+.cmp-card{border-top:4px solid #a3261c}
+.cmp-ctl{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:end;margin:6px 0 14px}
+.cmp-per{border:1px solid var(--line);border-radius:8px;padding:6px 10px 10px;margin:0;display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:0}
+.cmp-per legend{font-size:.78rem;font-weight:700;padding:0 4px}
+.cmp-per.a{border-left:4px solid #3a3424}.cmp-per.b{border-left:4px solid #d6ccb0}
+.cmp-res{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;align-items:stretch}
+.cmp-boxes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cmp-box{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.cmp-box span{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.cmp-box b{font-size:2.2rem;line-height:1.1}.cmp-box small{color:var(--muted)}
+.cmp-box.a{border-left:5px solid #3a3424}.cmp-box.b{border-left:5px solid #d6ccb0}
+.cmp-verdict{border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:4px;border:1px solid var(--line)}
+.cmp-verdict .w{font-size:1.35rem;font-weight:800}.cmp-verdict .n{font-size:1rem;font-weight:600}
+.cmp-verdict.up{background:#fbeaea;color:#a3261c;border-color:#e8b7b2}
+.cmp-verdict.down{background:#eaf3e4;color:#2f5a22;border-color:#bcd6ad}
+.cmp-verdict.eq{background:#f3efe4;color:#5b5440}
+.cmp-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin-top:6px}
+.cmp-grid h3{font-size:.95rem;margin:0 0 6px}
+#cTable td.up,#cTable td.up strong{color:#a3261c}#cTable td.down,#cTable td.down strong{color:#2f5a22}
+@media (max-width:860px){.cmp-ctl,.cmp-res,.cmp-grid{grid-template-columns:1fr}}
+@media (max-width:480px){.cmp-boxes{grid-template-columns:1fr}}
+.cmp-card .rep-text{margin:12px 0 4px}
 </style>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha256-65UqrlgGoRAnKfKRuriH3eeDrOhZgZo1SCenduc+SGo=" crossorigin="" defer></script>
@@ -376,6 +400,23 @@ td.site{background:#fbeaea;font-weight:700}
     <div id="hPrintHead" class="print-only"></div>
     <div class="card hom-sum"><p id="hText" class="rep-text"></p><p id="hNote" class="muted small"></p></div>
     <div id="hKpis" class="kpis"></div>
+    <div class="card cmp-card">
+      <div class="card-h"><h2>Painel comparativo</h2><span class="muted small">Usa o município e o bairro escolhidos nos filtros acima.</span></div>
+      <div class="cmp-ctl noprint">
+        <label>Comparar<select id="cPreset"><option value="anterior">Período do filtro × período anterior</option><option value="anoanterior">Período do filtro × mesmo período do ano anterior</option><option value="livre">Escolher os dois períodos</option></select></label>
+        <fieldset class="cmp-per a"><legend>Período A</legend><label>De<select id="cA1"></select></label><label>Até<select id="cA2"></select></label></fieldset>
+        <fieldset class="cmp-per b"><legend>Período B (comparação)</legend><label>De<select id="cB1"></select></label><label>Até<select id="cB2"></select></label></fieldset>
+      </div>
+      <div class="cmp-res">
+        <div id="cBoxes" class="cmp-boxes"></div>
+        <div id="cVerdict" class="cmp-verdict"></div>
+      </div>
+      <p id="cText" class="rep-text"></p>
+      <div class="cmp-grid">
+        <div id="cMonthsWrap"><h3>Mês a mês</h3><div id="cMonths" class="gbars short"></div><p class="legend"><i class="c"></i>Período A<i class="p"></i>Período B</p></div>
+        <div><h3>Por município</h3><div id="cTable" class="table-wrap"></div></div>
+      </div>
+    </div>
     <div class="charts">
       <div class="card span2"><h2 id="hMonthsT">Vítimas por mês</h2><div id="hMonths" class="gbars"></div><p class="legend"><i class="c"></i>Ano escolhido<i class="p"></i>Ano anterior · coluna destacada = período do filtro</p></div>
       <div class="card"><h2>Comparativo anual</h2><div id="hYears" class="gbars short"></div><p id="hYearsNote" class="muted small"></p></div>
@@ -1661,7 +1702,71 @@ function renderHom() {
   $('#hCasesT').textContent = `Casos lançados no site — ${P.label} (${fmtN(cases.length)})`;
   $('#hCases').innerHTML = cases.length ? `<table><thead><tr><th>Data</th><th>Hora</th>${S.admin ? '<th>Nº</th>' : ''}<th>Município</th><th>Bairro</th><th>CIA</th><th>Tipo</th><th>Meio</th><th class="n">Vítimas</th>${S.admin ? '<th>Local</th><th class="noprint"></th>' : ''}</tr></thead><tbody>${cases.map(r => `<tr data-id="${esc(r.id)}"><td class="nowrap">${fmtD(r.date)}</td><td>${esc(r.time)}</td>${S.admin ? `<td>${esc(r.ref)}</td>` : ''}<td>${esc(r.city)}</td><td>${esc(r.neighborhood)}</td><td>${esc(r.cia)}</td><td>${esc(r.cvli_tipo || 'Homicídio')}</td><td>${esc(r.meio || '')}</td><td class="n">${vit(r)}</td>${S.admin ? `<td class="small">${esc(r.location || '')}</td><td class="noprint"><button type="button" class="btn sm" data-hedit>Editar</button></td>` : ''}</tr>`).join('')}</tbody></table>` : '<p class="nodata">Nenhum caso lançado no site neste período.</p>';
   // cabeçalho de impressão
+  renderCmp();
   $('#hPrintHead').innerHTML = repHead('Relatório de Homicídios', `<strong>Período:</strong> ${P.label}${P.plabel ? ` · <strong>Comparação:</strong> ${P.plabel}` : ''}`, [city || 'Todos os municípios', nb ? 'Bairro: ' + nb : ''].filter(Boolean).join(' · '));
+}
+/* Painel comparativo: período A × período B, com aumento/redução no total, por mês e por município */
+function monthsRange(a, b) {
+  if (!a || !b) return [];
+  if (a > b) [a, b] = [b, a];
+  const out = []; let [y, m] = a.split('-').map(Number);
+  while (ymKey(y, m) <= b && out.length < 240) { out.push(ymKey(y, m)); if (++m > 12) { m = 1; y++; } }
+  return out;
+}
+const ymLabel = ym => `${MESES[+ym.slice(5) - 1]}/${ym.slice(0, 4)}`;
+const rangeLabel = ms => !ms.length ? '—' : ms.length === 1 ? `${MESL[+ms[0].slice(5) - 1]} de ${ms[0].slice(0, 4)}` : `${ymLabel(ms[0])} a ${ymLabel(ms[ms.length - 1])}`;
+function fillCmpSelects() {
+  const cur = today().slice(0, 7), first = homFirstMonth() > '2000' ? homFirstMonth() : cur;
+  const opts = monthsRange(first, cur).reverse().map(m => `<option value="${m}">${ymLabel(m)}</option>`).join('');
+  ['#cA1', '#cA2', '#cB1', '#cB2'].forEach(id => { const el = $(id), v = el.value; if (el.dataset.n !== String(opts.length)) { el.innerHTML = opts; el.dataset.n = opts.length; if (v) el.value = v; } });
+}
+function cmpPreset() {
+  const mode = $('#cPreset').value;
+  if (mode === 'livre') return;
+  const P = homPeriod(), cur = today().slice(0, 7);
+  let A = P.months;
+  if (P.per === 'tudo' || !A.length) A = monthsRange(cur.slice(0, 4) + '-01', cur);
+  const back = n => A.map(m => { let [y, mm] = m.split('-').map(Number); mm -= n; while (mm < 1) { mm += 12; y--; } return ymKey(y, mm); });
+  const B = mode === 'anoanterior' || P.per === 'tudo' || P.per === 'ano' ? back(12) : back(P.per === 'mes' ? 1 : 3);
+  $('#cA1').value = A[0]; $('#cA2').value = A[A.length - 1]; $('#cB1').value = B[0]; $('#cB2').value = B[B.length - 1];
+}
+function renderCmp() {
+  fillCmpSelects(); cmpPreset();
+  const A = monthsRange($('#cA1').value, $('#cA2').value), B = monthsRange($('#cB1').value, $('#cB2').value);
+  const city = $('#hCity').value, nb = $('#hNb').value, I = homIndex(nb), cities = city ? [city] : homCities();
+  const val = (ms, c) => ms.reduce((a, ym) => a + homValue(I, ym, c, nb), 0);
+  const tot = ms => cities.reduce((a, c) => a + val(ms, c), 0);
+  const a = tot(A), b = tot(B), d = a - b, [vc, vt] = variation(a, b);
+  const la = rangeLabel(A), lb = rangeLabel(B), scope = nb ? `${nb}${city ? ', ' + city : ''}` : city || 'toda a área do 20º BPM';
+  const word = d > 0 ? 'AUMENTO' : d < 0 ? 'REDUÇÃO' : 'ESTABILIDADE';
+  $('#cVerdict').className = 'cmp-verdict ' + vc;
+  $('#cVerdict').innerHTML = `<span class="w">${d > 0 ? '▲' : d < 0 ? '▼' : '='} ${word}</span><span class="n">${d ? (d > 0 ? '+' : '−') + fmtN(Math.abs(d)) + ' ' + (Math.abs(d) === 1 ? 'vítima' : 'vítimas') : 'mesmo número'}${b && d ? ` · ${d > 0 ? '+' : '−'}${pct(d / b * 100)}` : ''}</span>`;
+  const avg = (n, ms) => ms.length ? (n / ms.length).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0';
+  $('#cBoxes').innerHTML = `<div class="cmp-box a"><span>Período A</span><b>${fmtN(a)}</b><small>${esc(la)} · ${pl(A.length, 'mês', 'meses')} · média ${avg(a, A)}/mês</small></div>
+    <div class="cmp-box b"><span>Período B</span><b>${fmtN(b)}</b><small>${esc(lb)} · ${pl(B.length, 'mês', 'meses')} · média ${avg(b, B)}/mês</small></div>`;
+  let txt = `Em ${scope}: ${la} teve ${pl(a, 'vítima', 'vítimas')} de homicídio, contra ${fmtN(b)} em ${lb}`;
+  txt += d === 0 ? ' — mesmo número.' : !b ? ' (sem registro no período de comparação).' : ` — ${d > 0 ? 'aumento' : 'redução'} de ${fmtN(Math.abs(d))} (${pct(d / b * 100)}).`;
+  if (A.length !== B.length) txt += ` Atenção: os períodos têm durações diferentes (${pl(A.length, 'mês', 'meses')} × ${pl(B.length, 'mês', 'meses')}); compare também as médias mensais.`;
+  if (!city && a + b) {
+    const ch = cities.map(c => [c, val(A, c) - val(B, c)]).filter(x => x[1]);
+    const up = ch.filter(x => x[1] > 0).sort((x, y) => y[1] - x[1]), dn = ch.filter(x => x[1] < 0).sort((x, y) => x[1] - y[1]);
+    if (up.length) txt += ` Maior aumento: ${up[0][0]} (+${fmtN(up[0][1])}).`;
+    if (dn.length) txt += ` Maior redução: ${dn[0][0]} (−${fmtN(-dn[0][1])}).`;
+  }
+  $('#cText').textContent = txt;
+  // mês a mês (posição a posição)
+  const n = Math.max(A.length, B.length), show = n <= 24;
+  $('#cMonthsWrap').classList.toggle('hidden', !show);
+  if (show) {
+    const sameM = A.every((m, i) => !B[i] || m.slice(5) === B[i].slice(5)), mm = ym => ym ? MESES[+ym.slice(5) - 1] : '–';
+    const labs = Array.from({ length: n }, (_, i) => sameM ? mm(A[i]) : `${mm(A[i])}×${mm(B[i])}`);
+    vbarsPair($('#cMonths'), labs, Array.from({ length: n }, (_, i) => A[i] ? tot([A[i]]) : 0), Array.from({ length: n }, (_, i) => B[i] ? tot([B[i]]) : 0));
+    $$('#cMonths .gb').forEach((g, i) => g.title = `${A[i] ? ymLabel(A[i]) : '—'}: ${A[i] ? tot([A[i]]) : 0} × ${B[i] ? ymLabel(B[i]) : '—'}: ${B[i] ? tot([B[i]]) : 0}`);
+  }
+  // por município
+  const rows = cities.map(c => [c, val(A, c), val(B, c)]).filter(r => r[1] || r[2]).sort((x, y) => (y[1] - y[2]) - (x[1] - x[2]) || y[1] - x[1]);
+  $('#cTable').innerHTML = rows.length ? `<table><thead><tr><th>${nb ? 'Bairro / município' : 'Município'}</th><th class="n">A</th><th class="n">B</th><th class="n">Diferença</th><th class="n">Variação</th></tr></thead><tbody>${rows.map(([c, x, y]) => { const [k, t] = variation(x, y), dd = x - y; return `<tr><td>${esc(c)}</td><td class="n"><strong>${fmtN(x)}</strong></td><td class="n">${fmtN(y)}</td><td class="n ${k}">${dd > 0 ? '+' : dd < 0 ? '−' : ''}${fmtN(Math.abs(dd))}</td><td class="n ${k}"><strong>${t}</strong></td></tr>`; }).join('')}
+    <tr class="total"><td>Total</td><td class="n">${fmtN(a)}</td><td class="n">${fmtN(b)}</td><td class="n ${vc}">${d > 0 ? '+' : d < 0 ? '−' : ''}${fmtN(Math.abs(d))}</td><td class="n ${vc}">${vt}</td></tr></tbody></table>` : '<p class="nodata">Nenhum homicídio nos dois períodos.</p>';
 }
 async function saveHom(ev) {
   ev.preventDefault();
@@ -1763,6 +1868,8 @@ function bind() {
   $('#btnBk').addEventListener('click', importBackup);
   ['#hPer', '#hYear', '#hQ', '#hMonth', '#hCity', '#hNb'].forEach(id => $(id).addEventListener('change', () => { if (id === '#hCity') $('#hNb').value = ''; renderHom(); }));
   $('#hPrint').addEventListener('click', () => window.print());
+  $('#cPreset').addEventListener('change', renderCmp);
+  ['#cA1', '#cA2', '#cB1', '#cB2'].forEach(id => $(id).addEventListener('change', () => { $('#cPreset').value = 'livre'; renderCmp(); }));
   $('#formHom').addEventListener('submit', saveHom);
   $('#btnCvli').addEventListener('click', importCvli);
   $('#hCases').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr && e.target.closest('[data-hedit]')) openEdit(tr.dataset.id); });
