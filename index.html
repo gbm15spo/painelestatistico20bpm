@@ -310,6 +310,16 @@ td.site{background:#fbeaea;font-weight:700}
 #cTable td.up,#cTable td.up strong{color:#a3261c}#cTable td.down,#cTable td.down strong{color:#2f5a22}
 @media (max-width:860px){.cmp-res,.cmp-grid{grid-template-columns:1fr}}
 @media (max-width:480px){.cmp-boxes{grid-template-columns:1fr}.cmp-vs{display:none}.cmp-ctl label{flex:1 1 40%;min-width:0}}
+
+/* Relatório de homicídios: na impressão sai só o relatório */
+@media print{
+  body.print-hom #tab-homicidios > :not(#homReport){display:none!important}
+  body.print-hom #homReport{display:block!important}
+  #homReport .rep-kpis em{display:block;font-style:normal;font-weight:700;font-size:.78rem;margin-top:2px}
+  #homReport td.up,#homReport td.up strong{color:#a3261c}#homReport td.down,#homReport td.down strong{color:#2f5a22}
+  #homReport table{break-inside:auto}#homReport tr{break-inside:avoid}#homReport h3{break-after:avoid}
+}
+#homReport td.n,#homReport th.n{white-space:nowrap}
 </style>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha256-65UqrlgGoRAnKfKRuriH3eeDrOhZgZo1SCenduc+SGo=" crossorigin="" defer></script>
@@ -389,7 +399,7 @@ td.site{background:#fbeaea;font-weight:700}
   <section id="tab-homicidios" class="tab">
     <div class="hom-banner noprint">
       <div><h2>Homicídios</h2><p>Homicídios na área do 20º BPM: planilha consolidada desde 2023 + casos lançados no site.</p></div>
-      <button type="button" class="btn" id="hPrint" data-auth>Imprimir / Salvar em PDF</button>
+      <button type="button" class="btn" id="hPrint" data-auth>Relatório: imprimir / salvar em PDF</button>
     </div>
     <div class="card filters noprint">
       <label>Período<select id="hPer"><option value="mes">Mês</option><option value="trimestre">Trimestre</option><option value="semestre">Semestre</option><option value="ano" selected>Ano</option><option value="tudo">Tudo (2023 em diante)</option></select></label>
@@ -400,7 +410,6 @@ td.site{background:#fbeaea;font-weight:700}
       <label>Município<select id="hCity"></select></label>
       <label>Bairro<select id="hNb"></select></label>
     </div>
-    <div id="hPrintHead" class="print-only"></div>
     <div class="card hom-sum"><p id="hText" class="rep-text"></p><p id="hNote" class="muted small"></p></div>
     <div id="hKpis" class="kpis"></div>
     <div class="card cmp-card">
@@ -445,6 +454,7 @@ td.site{background:#fbeaea;font-weight:700}
       <p class="muted">Envie uma nova versão da planilha de homicídios (.xlsx, no mesmo formato). Os meses e municípios que estiverem na planilha substituem os anteriores.</p>
       <div class="row-inline"><input type="file" id="cvliFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><button type="button" id="btnCvli" class="btn primary">Importar planilha</button></div>
     </div>
+    <article id="homReport" class="report print-only"></article>
   </section>
 
   <!-- CADASTRO -->
@@ -503,7 +513,7 @@ td.site{background:#fbeaea;font-weight:700}
     <div class="card filters noprint">
       <label>Período<select id="rKind">
         <option value="dia">Dia</option><option value="semana">Semana</option><option value="mes" selected>Mês</option>
-        <option value="trimestre">Trimestre</option><option value="ano">Ano</option><option value="custom">Entre datas (de… até…)</option>
+        <option value="trimestre">Trimestre</option><option value="semestre">Semestre</option><option value="ano">Ano</option><option value="custom">Entre datas (de… até…)</option>
       </select></label>
       <label data-r="ref">Data de referência<input type="date" id="rRef"></label>
       <label data-r="custom">De<input type="date" id="rFrom"></label>
@@ -1245,7 +1255,7 @@ async function removeRec(id) {
 }
 
 /* ---------- Relatórios (somente administrador) ---------- */
-const PER = { dia: 'Diário', semana: 'Semanal', mes: 'Mensal', trimestre: 'Trimestral', ano: 'Anual', custom: 'por Período' };
+const PER = { dia: 'Diário', semana: 'Semanal', mes: 'Mensal', trimestre: 'Trimestral', semestre: 'Semestral', ano: 'Anual', custom: 'por Período' };
 const DIAS = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
 const dU = s => new Date(s + 'T00:00:00Z');
 const isoU = d => d.toISOString().slice(0, 10);
@@ -1268,6 +1278,7 @@ function periodOf(kind, ref) {
   if (kind === 'semana') { const a = addDays(ref, -((d.getUTCDay() + 6) % 7)); return [a, addDays(a, 6)]; }
   if (kind === 'mes') return [isoU(new Date(Date.UTC(y, m, 1))), isoU(new Date(Date.UTC(y, m + 1, 0)))];
   if (kind === 'trimestre') { const q = Math.floor(m / 3) * 3; return [isoU(new Date(Date.UTC(y, q, 1))), isoU(new Date(Date.UTC(y, q + 3, 0)))]; }
+  if (kind === 'semestre') { const q = m < 6 ? 0 : 6; return [isoU(new Date(Date.UTC(y, q, 1))), isoU(new Date(Date.UTC(y, q + 6, 0)))]; }
   return [y + '-01-01', y + '-12-31'];
 }
 function shiftYear(s, n) {
@@ -1291,7 +1302,7 @@ function variation(c, p) {
 }
 /* Granularidade do gráfico de evolução: h = faixa de horário, d = dia, w = semana, m = mês, y = ano */
 function granOf(kind, a, b) {
-  if (kind === 'trimestre' || kind === 'ano') return 'm';
+  if (kind === 'trimestre' || kind === 'semestre' || kind === 'ano') return 'm';
   const n = dayDiff(a, b) + 1;
   return n === 1 ? 'h' : n <= 31 ? 'd' : n <= 120 ? 'w' : n <= 800 ? 'm' : 'y';
 }
@@ -1713,7 +1724,6 @@ function renderHom() {
   $('#hCases').innerHTML = cases.length ? `<table><thead><tr><th>Data</th><th>Hora</th>${S.admin ? '<th>Nº</th>' : ''}<th>Município</th><th>Bairro</th><th>CIA</th><th>Tipo</th><th>Meio</th><th class="n">Vítimas</th>${S.admin ? '<th>Local</th><th class="noprint"></th>' : ''}</tr></thead><tbody>${cases.map(r => `<tr data-id="${esc(r.id)}"><td class="nowrap">${fmtD(r.date)}</td><td>${esc(r.time)}</td>${S.admin ? `<td>${esc(r.ref)}</td>` : ''}<td>${esc(r.city)}</td><td>${esc(r.neighborhood)}</td><td>${esc(r.cia)}</td><td>${esc(r.cvli_tipo || 'Homicídio')}</td><td>${esc(r.meio || '')}</td><td class="n">${vit(r)}</td>${S.admin ? `<td class="small">${esc(r.location || '')}</td><td class="noprint"><button type="button" class="btn sm" data-hedit>Editar</button></td>` : ''}</tr>`).join('')}</tbody></table>` : '<p class="nodata">Nenhum caso lançado no site neste período.</p>';
   // cabeçalho de impressão
   renderCmp();
-  $('#hPrintHead').innerHTML = repHead('Relatório de Homicídios', `<strong>Período:</strong> ${P.label}${P.plabel ? ` · <strong>Comparação:</strong> ${P.plabel}` : ''}`, [city || 'Todos os municípios', nb ? 'Bairro: ' + nb : ''].filter(Boolean).join(' · '));
 }
 /* Painel comparativo: o período escolhido × o MESMO período do ano anterior */
 function monthsRange(a, b) {
@@ -1792,6 +1802,72 @@ function renderCmp() {
   $('#cTable').innerHTML = rows.length ? `<table><thead><tr><th>Município</th><th class="n">${esc(ha)}</th><th class="n">${esc(hb)}</th><th class="n">Diferença</th><th class="n">Variação</th></tr></thead><tbody>${rows.map(([c, x, y]) => { const dd = x - y, k = dd > 0 ? 'up' : dd < 0 ? 'down' : 'eq'; return `<tr><td>${esc(c)}</td><td class="n"><strong>${fmtN(x)}</strong></td><td class="n">${fmtN(y)}</td><td class="n ${k}">${dd > 0 ? '+' : dd < 0 ? '−' : ''}${fmtN(Math.abs(dd))}</td><td class="n ${k}"><strong>${vtxt(x, y)}</strong></td></tr>`; }).join('')}
     <tr class="total"><td>Total</td><td class="n">${fmtN(a)}</td><td class="n">${fmtN(b)}</td><td class="n ${vc}">${d > 0 ? '+' : d < 0 ? '−' : ''}${fmtN(Math.abs(d))}</td><td class="n ${vc}">${vtxt(a, b)}</td></tr></tbody></table>
     <p class="muted small">"novo" = não houve homicídio no mesmo período do ano anterior.</p>` : '<p class="nodata">Nenhum homicídio nos dois períodos.</p>';
+}
+/* Relatório de homicídios (impressão / PDF): período marcado nos filtros + comparações */
+function renderHomReport() {
+  const P = homPeriod(), A = P.months, city = $('#hCity').value, nb = $('#hNb').value, I = homIndex(nb);
+  const cities = city ? [city] : homCities(), first = homFirstMonth();
+  const val = (ms, c) => ms.reduce((a, ym) => a + homValue(I, ym, c, nb), 0), tot = ms => cities.reduce((a, c) => a + val(ms, c), 0);
+  const scope = nb ? `${nb}${city ? ', ' + city : ''}` : city || 'toda a área do 20º BPM';
+  const a = tot(A);
+  // comparações: período anterior e mesmo período do ano anterior (no Ano as duas coincidem)
+  const cmps = [];
+  const ok = ms => ms.length && ms[0] >= first;
+  if (P.per !== 'tudo' && P.per !== 'ano' && ok(P.prev)) cmps.push({ key: 'prev', name: 'Período anterior', label: P.plabel, ms: P.prev });
+  const Y = A.map(minusYear);
+  if (P.per !== 'tudo' && ok(Y)) cmps.push({ key: 'year', name: 'Mesmo período do ano anterior', label: rangeLabel(Y), ms: Y });
+  cmps.forEach(c => { c.n = tot(c.ms); c.d = a - c.n; c.v = variation(a, c.n); });
+  const vword = c => c.d === 0 ? 'mesmo número' : !c.n ? 'sem registro na comparação' : `${c.d > 0 ? 'aumento' : 'redução'} de ${pct(c.d / c.n * 100)} (${c.d > 0 ? '+' : '−'}${fmtN(Math.abs(c.d))})`;
+  let txt = `${P.label}${P.partial ? ' (até hoje)' : ''}: ${pl(a, 'vítima', 'vítimas')} de homicídio em ${scope}.`;
+  cmps.forEach(c => { txt += ` Em relação ${c.key === 'prev' ? 'ao período anterior' : 'ao mesmo período do ano anterior'} (${c.label}, ${fmtN(c.n)}): ${vword(c)}.`; });
+  if (!cmps.length && P.per !== 'tudo') txt += ' Não há dados anteriores para comparação (a planilha começa em 2023).';
+  if (!city && a) { const t = topOf(cities.map(c => [c, val(A, c)])); if (t && t[1]) txt += ` ${t[0]} concentra ${fmtN(t[1])} (${pct(t[1] / a * 100)}).`; }
+  const cases = homCases().filter(r => A.includes(r.date.slice(0, 7)) && (!city || r.city === city) && (!nb || r.neighborhood === nb)).sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
+  const sign = d => d > 0 ? '+' : d < 0 ? '−' : '';
+  const vcell = (x, y) => { const [k, t] = variation(x, y), d = x - y; return `<td class="n ${k}">${sign(d)}${fmtN(Math.abs(d))}</td><td class="n ${k}"><strong>${x === y ? '=' : !y ? 'novo' : t}</strong></td>`; };
+  // KPIs
+  const kp = [`<div><b>${fmtN(a)}</b><span>${esc(P.label)}${P.partial ? ' (até hoje)' : ''}</span></div>`,
+    ...cmps.map(c => `<div><b>${fmtN(c.n)}</b><span>${esc(c.name)}: ${esc(c.label)}</span><em class="${c.v[0]}">${c.v[1]}</em></div>`),
+    `<div><b>${(a / (A.length || 1)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</b><span>Média por mês</span></div>`];
+  let html = repHead('Relatório de Homicídios', `<strong>Período:</strong> ${esc(P.label)}${P.partial ? ' (até hoje)' : ''}${cmps.length ? ` · <strong>Comparações:</strong> ${cmps.map(c => esc(c.label)).join(' e ')}` : ''}`, [city || 'Todos os municípios', nb ? 'Bairro: ' + nb : ''].filter(Boolean).join(' · '));
+  html += `<h3>Resumo</h3><p class="rep-text">${esc(txt)}</p><div class="rep-kpis">${kp.slice(0, 4).join('')}</div>`;
+  if (cmps.length) {
+    html += `<h3>Comparações do período</h3><table><thead><tr><th>Comparação</th><th>Período</th><th class="n">Vítimas</th><th class="n">Período marcado</th><th class="n">Diferença</th><th class="n">Variação</th></tr></thead><tbody>
+      ${cmps.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.label)}</td><td class="n">${fmtN(c.n)}</td><td class="n"><strong>${fmtN(a)}</strong></td>${vcell(a, c.n)}</tr>`).join('')}</tbody></table>`;
+  }
+  // por município, com as comparações
+  const rows = cities.map(c => [c, val(A, c), ...cmps.map(x => val(x.ms, c))]).filter(r => r.slice(1).some(Boolean)).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
+  if (rows.length && !nb) {
+    html += `<h3>Por município</h3><table class="matrix"><thead><tr><th>Município</th><th class="n">Período</th>${cmps.map(c => `<th class="n">${c.key === 'prev' ? 'Per. anterior' : 'Ano anterior'}</th><th class="n">Dif.</th><th class="n">Var.</th>`).join('')}</tr></thead><tbody>
+      ${rows.map(r => `<tr><td>${esc(r[0])}</td><td class="n"><strong>${fmtN(r[1])}</strong></td>${cmps.map((c, i) => `<td class="n">${fmtN(r[2 + i])}</td>${vcell(r[1], r[2 + i])}`).join('')}</tr>`).join('')}
+      <tr class="total"><td>Total</td><td class="n">${fmtN(a)}</td>${cmps.map(c => `<td class="n">${fmtN(c.n)}</td>${vcell(a, c.n)}`).join('')}</tr></tbody></table>`;
+  }
+  // mês a mês (período × ano anterior)
+  const yc = cmps.find(c => c.key === 'year');
+  if (A.length > 1) {
+    html += `<h3>Mês a mês${yc ? ' — comparado ao ano anterior' : ''}</h3><table><thead><tr><th>Mês</th><th class="n">Vítimas</th>${yc ? '<th class="n">Ano anterior</th><th class="n">Diferença</th><th class="n">Variação</th>' : ''}</tr></thead><tbody>
+      ${A.map((m, i) => `<tr><td>${ymLabel(m)}</td><td class="n"><strong>${fmtN(tot([m]))}</strong></td>${yc ? `<td class="n">${fmtN(tot([yc.ms[i]]))}</td>${vcell(tot([m]), tot([yc.ms[i]]))}` : ''}</tr>`).join('')}</tbody></table>`;
+  }
+  if (P.per === 'tudo') {
+    const ys = homYears(), cur = today().slice(0, 7);
+    html += `<h3>Por ano</h3><table><thead><tr><th>Ano</th><th class="n">Vítimas</th><th class="n">Diferença</th><th class="n">Variação</th></tr></thead><tbody>${ys.map((y, i) => { const v = tot(monthsRange(y + '-01', y + '-12').filter(m => m <= cur)), pv = i ? tot(monthsRange(ys[i - 1] + '-01', ys[i - 1] + '-12')) : null; return `<tr><td>${y}${String(y) === cur.slice(0, 4) ? ' (até hoje)' : ''}</td><td class="n"><strong>${fmtN(v)}</strong></td>${pv === null ? '<td></td><td></td>' : vcell(v, pv)}</tr>`; }).join('')}</tbody></table>`;
+  }
+  // casos lançados no site
+  if (cases.length) {
+    const grp = fn => { const m = new Map(); cases.forEach(r => { const k = fn(r) || 'Não informado'; m.set(k, (m.get(k) || 0) + vit(r)); }); return [...m].sort((x, y) => y[1] - x[1]); };
+    const small = (t, arr) => `<div><h3>${t}</h3><table><tbody>${arr.slice(0, 10).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${fmtN(v)}</td></tr>`).join('')}</tbody></table></div>`;
+    html += `<div class="rep-grid">${small('Por bairro (casos lançados no site)', grp(r => r.neighborhood + (city ? '' : ', ' + r.city)))}${small('Meio empregado', grp(r => r.meio))}${small('Por CIA', grp(r => r.cia))}${small('Faixa de horário', grp(r => { const h = +(r.time || '').slice(0, 2); return !r.time ? '' : h < 6 ? '00h–06h' : h < 12 ? '06h–12h' : h < 18 ? '12h–18h' : '18h–24h'; }))}</div>`;
+    html += `<h3>Relação dos casos lançados no site (${fmtN(cases.length)})</h3><table><thead><tr><th>Data</th><th>Hora</th><th>Nº</th><th>Município</th><th>Bairro</th><th>CIA</th><th>Meio</th><th class="n">Vítimas</th></tr></thead><tbody>${cases.map(r => `<tr><td class="nowrap">${fmtD(r.date)}</td><td>${esc(r.time)}</td><td>${esc(r.ref)}</td><td>${esc(r.city)}</td><td>${esc(r.neighborhood)}</td><td>${esc(r.cia)}</td><td>${esc(r.meio || '')}</td><td class="n">${vit(r)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  html += `<p class="muted small">Fonte: planilha de homicídios do 20º BPM (2023 em diante) + casos lançados no site. No mesmo mês e município vale o maior número das duas fontes.${nb ? ' Com bairro escolhido, a contagem usa só os casos lançados no site.' : ''}</p>` + repFoot();
+  $('#homReport').innerHTML = html;
+}
+function printHom() {
+  renderHomReport();
+  document.body.classList.add('print-hom');
+  const off = () => { document.body.classList.remove('print-hom'); window.removeEventListener('afterprint', off); };
+  window.addEventListener('afterprint', off);
+  window.print();
 }
 async function saveHom(ev) {
   ev.preventDefault();
@@ -1892,7 +1968,7 @@ function bind() {
   });
   $('#btnBk').addEventListener('click', importBackup);
   ['#hPer', '#hYear', '#hQ', '#hS', '#hMonth', '#hCity', '#hNb'].forEach(id => $(id).addEventListener('change', () => { if (id === '#hCity') $('#hNb').value = ''; if (!['#hCity', '#hNb'].includes(id)) S.cmpFollow = true; renderHom(); }));
-  $('#hPrint').addEventListener('click', () => window.print());
+  $('#hPrint').addEventListener('click', printHom);
   ['#cA1', '#cA2'].forEach(id => $(id).addEventListener('change', () => { S.cmpFollow = false; renderCmp(); }));
   $('#cReset').addEventListener('click', () => { S.cmpFollow = true; renderCmp(); });
   $('#formHom').addEventListener('submit', saveHom);
