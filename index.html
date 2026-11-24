@@ -392,9 +392,10 @@ td.site{background:#fbeaea;font-weight:700}
       <button type="button" class="btn" id="hPrint" data-auth>Imprimir / Salvar em PDF</button>
     </div>
     <div class="card filters noprint">
-      <label>Período<select id="hPer"><option value="mes">Mês</option><option value="trimestre">Trimestre</option><option value="ano" selected>Ano</option><option value="tudo">Tudo (2023 em diante)</option></select></label>
+      <label>Período<select id="hPer"><option value="mes">Mês</option><option value="trimestre">Trimestre</option><option value="semestre">Semestre</option><option value="ano" selected>Ano</option><option value="tudo">Tudo (2023 em diante)</option></select></label>
       <label>Ano<select id="hYear"></select></label>
       <label>Trimestre<select id="hQ"><option value="0">1º trimestre (jan–mar)</option><option value="1">2º trimestre (abr–jun)</option><option value="2">3º trimestre (jul–set)</option><option value="3">4º trimestre (out–dez)</option></select></label>
+      <label>Semestre<select id="hS"><option value="0">1º semestre (jan–jun)</option><option value="1">2º semestre (jul–dez)</option></select></label>
       <label>Mês<select id="hMonth"><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></label>
       <label>Município<select id="hCity"></select></label>
       <label>Bairro<select id="hNb"></select></label>
@@ -1589,6 +1590,7 @@ async function renameBairro(ev) {
 /* ---------- Homicídios ---------- */
 // Duas fontes: a planilha consolidada (totais por município e mês, sem bairro) e os casos lançados no site (com bairro).
 // No mesmo mês e município vale o MAIOR número das duas, para não contar o mesmo caso duas vezes.
+const SLAB = ['1º semestre (jan–jun)', '2º semestre (jul–dez)'];
 const QLAB = ['1º trimestre (jan–mar)', '2º trimestre (abr–jun)', '3º trimestre (jul–set)', '4º trimestre (out–dez)'];
 const MESL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 async function loadCvli() {
@@ -1615,30 +1617,34 @@ function homYears() {
   ys.add(+today().slice(0, 4)); return [...ys].sort((a, b) => a - b);
 }
 function homPeriod() {
-  const per = $('#hPer').value, y = +$('#hYear').value, q = +$('#hQ').value, mo = +$('#hMonth').value;
+  const per = $('#hPer').value, y = +$('#hYear').value, q = +$('#hQ').value, sm = +$('#hS').value, mo = +$('#hMonth').value;
   const cur = today().slice(0, 7);
   let months = [];
   if (per === 'mes') months = [ymKey(y, mo)];
   else if (per === 'trimestre') months = [1, 2, 3].map(i => ymKey(y, q * 3 + i));
+  else if (per === 'semestre') months = [1, 2, 3, 4, 5, 6].map(i => ymKey(y, sm * 6 + i));
   else if (per === 'ano') months = Array.from({ length: 12 }, (_, i) => ymKey(y, i + 1));
   else { const ys = homYears(); ys.forEach(yy => { for (let i = 1; i <= 12; i++) months.push(ymKey(yy, i)); }); }
   months = months.filter(m => m <= cur);
   // período anterior equivalente (no ano em curso, compara só até o mesmo mês)
   const shift = (ym, n) => { let [yy, mm] = ym.split('-').map(Number); mm -= n; while (mm < 1) { mm += 12; yy--; } return ymKey(yy, mm); };
-  const prev = per === 'tudo' ? [] : months.map(m => shift(m, per === 'mes' ? 1 : per === 'trimestre' ? 3 : 12));
-  const label = per === 'mes' ? `${MESL[mo - 1]} de ${y}` : per === 'trimestre' ? `${QLAB[q]} de ${y}` : per === 'ano' ? `Ano de ${y}` : 'Todo o período';
-  const plabel = !prev.length ? '' : per === 'mes' ? `${MESL[+prev[0].slice(5) - 1]} de ${prev[0].slice(0, 4)}` : per === 'trimestre' ? `${QLAB[(q + 3) % 4]} de ${prev[0].slice(0, 4)}` : `${y - 1}${months.length < 12 ? ` (jan–${MESES[months.length - 1]})` : ''}`;
-  return { per, y, months, prev, label, plabel, partial: per !== 'tudo' && months.length < (per === 'ano' ? 12 : per === 'trimestre' ? 3 : 1) };
+  const prev = per === 'tudo' ? [] : months.map(m => shift(m, per === 'mes' ? 1 : per === 'trimestre' ? 3 : per === 'semestre' ? 6 : 12));
+  const label = per === 'mes' ? `${MESL[mo - 1]} de ${y}` : per === 'trimestre' ? `${QLAB[q]} de ${y}` : per === 'semestre' ? `${SLAB[sm]} de ${y}` : per === 'ano' ? `Ano de ${y}` : 'Todo o período';
+  const plabel = !prev.length ? '' : per === 'mes' ? `${MESL[+prev[0].slice(5) - 1]} de ${prev[0].slice(0, 4)}` : per === 'trimestre' ? `${QLAB[(q + 3) % 4]} de ${prev[0].slice(0, 4)}` : per === 'semestre' ? `${SLAB[1 - sm]} de ${prev[0].slice(0, 4)}` : `${y - 1}${months.length < 12 ? ` (jan–${MESES[months.length - 1]})` : ''}`;
+  const nFull = per === 'semestre' ? 6 : per === 'trimestre' ? 3 : 0;
+  const plab = nFull && prev.length && prev.length < nFull ? `${MESES[+prev[0].slice(5) - 1]}–${MESES[+prev[prev.length - 1].slice(5) - 1]} de ${prev[0].slice(0, 4)}` : plabel;
+  return { per, y, months, prev, label, plabel: plab, partial: per !== 'tudo' && months.length < (per === 'ano' ? 12 : per === 'semestre' ? 6 : per === 'trimestre' ? 3 : 1) };
 }
 function fillHomFilters() {
   const ys = homYears(), keep = (sel, opts) => { const v = sel.value; sel.innerHTML = opts; if ([...sel.options].some(o => o.value === v)) sel.value = v; };
   keep($('#hYear'), ys.map(y => `<option>${y}</option>`).join(''));
-  if (!$('#hYear').dataset.init) { $('#hYear').value = String(ys[ys.length - 1]); $('#hMonth').value = String(+today().slice(5, 7)); $('#hQ').value = String(Math.floor((+today().slice(5, 7) - 1) / 3)); $('#hYear').dataset.init = 1; }
+  if (!$('#hYear').dataset.init) { $('#hYear').value = String(ys[ys.length - 1]); $('#hMonth').value = String(+today().slice(5, 7)); $('#hQ').value = String(Math.floor((+today().slice(5, 7) - 1) / 3)); $('#hS').value = +today().slice(5, 7) > 6 ? '1' : '0'; $('#hYear').dataset.init = 1; }
   keep($('#hCity'), '<option value="">Todos os municípios</option>' + homCities().map(c => `<option>${esc(c)}</option>`).join(''));
   const city = $('#hCity').value;
   keep($('#hNb'), '<option value="">Todos os bairros</option>' + uniq(homCases().filter(r => !city || r.city === city).map(r => r.neighborhood)).map(b => `<option>${esc(b)}</option>`).join(''));
   const per = $('#hPer').value;
   $('#hQ').closest('label').classList.toggle('hidden', per !== 'trimestre');
+  $('#hS').closest('label').classList.toggle('hidden', per !== 'semestre');
   $('#hMonth').closest('label').classList.toggle('hidden', per !== 'mes');
   $('#hYear').closest('label').classList.toggle('hidden', per === 'tudo');
 }
@@ -1885,7 +1891,7 @@ function bind() {
     if (e.target.closest('[data-remove]')) removeRec(tr.dataset.id);
   });
   $('#btnBk').addEventListener('click', importBackup);
-  ['#hPer', '#hYear', '#hQ', '#hMonth', '#hCity', '#hNb'].forEach(id => $(id).addEventListener('change', () => { if (id === '#hCity') $('#hNb').value = ''; if (!['#hCity', '#hNb'].includes(id)) S.cmpFollow = true; renderHom(); }));
+  ['#hPer', '#hYear', '#hQ', '#hS', '#hMonth', '#hCity', '#hNb'].forEach(id => $(id).addEventListener('change', () => { if (id === '#hCity') $('#hNb').value = ''; if (!['#hCity', '#hNb'].includes(id)) S.cmpFollow = true; renderHom(); }));
   $('#hPrint').addEventListener('click', () => window.print());
   ['#cA1', '#cA2'].forEach(id => $(id).addEventListener('change', () => { S.cmpFollow = false; renderCmp(); }));
   $('#cReset').addEventListener('click', () => { S.cmpFollow = true; renderCmp(); });
