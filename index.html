@@ -320,6 +320,40 @@ td.site{background:#fbeaea;font-weight:700}
   #homReport table{break-inside:auto}#homReport tr{break-inside:avoid}#homReport h3{break-after:avoid}
 }
 #homReport td.n,#homReport th.n{white-space:nowrap}
+
+/* Relatório de homicídios (simples) */
+.hom-rep summary{cursor:pointer;font-weight:700}
+.rep-cities{display:flex;flex-wrap:wrap;gap:6px 16px;margin:8px 0 12px}
+.rep-cities label{flex-direction:row;align-items:center;gap:6px;color:var(--text);font-size:.92rem}
+.rep-cities input{width:17px;height:17px}
+.hr-top{display:grid;grid-template-columns:1fr 1fr 1fr 1.3fr;gap:8px;margin:12px 0 6px}
+.hr-n{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column}
+.hr-n span{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.hr-n b{font-size:2rem;line-height:1.15;color:#14130f}.hr-n.muted-n b{color:#6d6551}
+.hr-v{border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;justify-content:center;border:1px solid var(--line)}
+.hr-v b{font-size:1.25rem}.hr-v span{font-size:.82rem;font-weight:600}
+.hr-v.up{background:#fbeaea;color:#a3261c;border-color:#e8b7b2}.hr-v.down{background:#eaf3e4;color:#2f5a22;border-color:#bcd6ad}.hr-v.eq{background:#f3efe4;color:#5b5440}
+.hr-bars,.hr-years{display:flex;gap:6px;align-items:flex-end}
+.hb,.hy{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center}
+.hb-cols,.hy-col{height:120px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;border-bottom:1px solid #b9ae92}
+.hr-years .hy-col{height:80px}
+.col{width:42%;max-width:34px;position:relative;border-radius:3px 3px 0 0;min-height:1px}
+.hy .col{width:55%;max-width:46px;background:#3a3424}.hy.on .col{background:#a3261c}
+.col.p{background:#d6ccb0}.col.c{background:#a3261c}
+.col i{position:absolute;top:-15px;left:50%;transform:translateX(-50%);font-style:normal;font-size:.68rem;font-weight:700;color:#14130f}
+.hb-l{font-size:.72rem;font-weight:600;margin-top:3px}
+.hb-m{min-height:26px;margin-top:2px;text-align:center;line-height:1.15}
+.hb-m .mk{white-space:normal;display:inline-block}
+.mk{font-size:.68rem;font-weight:700;white-space:nowrap}.mk.up{color:#a3261c}.mk.down{color:#2f5a22}.mk.eq{color:#6d6551}
+.hr-rank .mk{font-size:.8rem}
+#homReport .legend i.c{background:#a3261c}
+@media print{.hr-top{grid-template-columns:1fr 1fr 1fr 1.3fr}}
+@media (max-width:700px){.hr-top{grid-template-columns:1fr 1fr}.hb .mk{font-size:.56rem}}
+#homReport .hr-rank td,#homReport .hr-rank th{padding:4px 8px}
+#homReport h3{margin:14px 0 8px}
+#homReport .rep-foot{margin-top:10px}
+#homReport .rep-meta{margin-bottom:8px}
+#homReport .hb-cols{height:110px}#homReport .hy-col{height:70px}
 </style>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha256-65UqrlgGoRAnKfKRuriH3eeDrOhZgZo1SCenduc+SGo=" crossorigin="" defer></script>
@@ -410,6 +444,12 @@ td.site{background:#fbeaea;font-weight:700}
       <label>Município<select id="hCity"></select></label>
       <label>Bairro<select id="hNb"></select></label>
     </div>
+    <details class="card noprint hom-rep hidden" data-auth>
+      <summary>Relatório para imprimir / PDF — escolher municípios</summary>
+      <p class="muted small">O relatório usa o período e o bairro escolhidos nos filtros acima e compara com o mesmo período do ano anterior.</p>
+      <div id="hRepCities" class="rep-cities"></div>
+      <div class="row-inline"><button type="button" class="btn sm ghost" id="hRepAll">Marcar / desmarcar todos</button><button type="button" class="btn primary" id="hPrint2">Gerar relatório (imprimir / PDF)</button></div>
+    </details>
     <div class="card hom-sum"><p id="hText" class="rep-text"></p><p id="hNote" class="muted small"></p></div>
     <div id="hKpis" class="kpis"></div>
     <div class="card cmp-card">
@@ -1666,7 +1706,7 @@ function vbarsPair(box, labels, cur, prev, hl) {
 }
 function renderHom() {
   if (!$('#tab-homicidios')) return;
-  fillHomFilters();
+  fillHomFilters(); fillRepCities();
   const P = homPeriod(), city = $('#hCity').value, nb = $('#hNb').value, I = homIndex(nb);
   const cities = city ? [city] : homCities();
   const sumMonths = ms => ms.reduce((a, ym) => a + cities.reduce((b, c) => b + homValue(I, ym, c, nb), 0), 0);
@@ -1803,66 +1843,74 @@ function renderCmp() {
     <tr class="total"><td>Total</td><td class="n">${fmtN(a)}</td><td class="n">${fmtN(b)}</td><td class="n ${vc}">${d > 0 ? '+' : d < 0 ? '−' : ''}${fmtN(Math.abs(d))}</td><td class="n ${vc}">${vtxt(a, b)}</td></tr></tbody></table>
     <p class="muted small">"novo" = não houve homicídio no mesmo período do ano anterior.</p>` : '<p class="nodata">Nenhum homicídio nos dois períodos.</p>';
 }
-/* Relatório de homicídios (impressão / PDF): período marcado nos filtros + comparações */
+/* Relatório de homicídios (impressão / PDF): período dos filtros, municípios marcados, comparação com o mesmo período do ano anterior */
+function fillRepCities() {
+  const box = $('#hRepCities'), all = homCities();
+  const prev = new Set($$('input', box).filter(x => x.checked).map(x => x.value)), had = box.children.length;
+  box.innerHTML = all.map(c => `<label><input type="checkbox" value="${esc(c)}"${!had || prev.has(c) ? ' checked' : ''}> ${esc(c)}</label>`).join('');
+}
+function syncRepCities() {
+  const city = $('#hCity').value;
+  $$('#hRepCities input').forEach(x => { x.checked = !city || x.value === city; });
+}
 function renderHomReport() {
-  const P = homPeriod(), A = P.months, city = $('#hCity').value, nb = $('#hNb').value, I = homIndex(nb);
-  const cities = city ? [city] : homCities(), first = homFirstMonth();
+  const P = homPeriod(), A = P.months, nb = $('#hNb').value, I = homIndex(nb), first = homFirstMonth();
+  const sel = $$('#hRepCities input').filter(x => x.checked).map(x => x.value);
+  const cities = sel.length ? sel : homCities(), allSel = cities.length === homCities().length;
   const val = (ms, c) => ms.reduce((a, ym) => a + homValue(I, ym, c, nb), 0), tot = ms => cities.reduce((a, c) => a + val(ms, c), 0);
-  const scope = nb ? `${nb}${city ? ', ' + city : ''}` : city || 'toda a área do 20º BPM';
-  const a = tot(A);
-  // comparações: período anterior e mesmo período do ano anterior (no Ano as duas coincidem)
-  const cmps = [];
-  const ok = ms => ms.length && ms[0] >= first;
-  if (P.per !== 'tudo' && P.per !== 'ano' && ok(P.prev)) cmps.push({ key: 'prev', name: 'Período anterior', label: P.plabel, ms: P.prev });
-  const Y = A.map(minusYear);
-  if (P.per !== 'tudo' && ok(Y)) cmps.push({ key: 'year', name: 'Mesmo período do ano anterior', label: rangeLabel(Y), ms: Y });
-  cmps.forEach(c => { c.n = tot(c.ms); c.d = a - c.n; c.v = variation(a, c.n); });
-  const vword = c => c.d === 0 ? 'mesmo número' : !c.n ? 'sem registro na comparação' : `${c.d > 0 ? 'aumento' : 'redução'} de ${pct(c.d / c.n * 100)} (${c.d > 0 ? '+' : '−'}${fmtN(Math.abs(c.d))})`;
-  let txt = `${P.label}${P.partial ? ' (até hoje)' : ''}: ${pl(a, 'vítima', 'vítimas')} de homicídio em ${scope}.`;
-  cmps.forEach(c => { txt += ` Em relação ${c.key === 'prev' ? 'ao período anterior' : 'ao mesmo período do ano anterior'} (${c.label}, ${fmtN(c.n)}): ${vword(c)}.`; });
-  if (!cmps.length && P.per !== 'tudo') txt += ' Não há dados anteriores para comparação (a planilha começa em 2023).';
-  if (!city && a) { const t = topOf(cities.map(c => [c, val(A, c)])); if (t && t[1]) txt += ` ${t[0]} concentra ${fmtN(t[1])} (${pct(t[1] / a * 100)}).`; }
-  const cases = homCases().filter(r => A.includes(r.date.slice(0, 7)) && (!city || r.city === city) && (!nb || r.neighborhood === nb)).sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
-  const sign = d => d > 0 ? '+' : d < 0 ? '−' : '';
-  const vcell = (x, y) => { const [k, t] = variation(x, y), d = x - y; return `<td class="n ${k}">${sign(d)}${fmtN(Math.abs(d))}</td><td class="n ${k}"><strong>${x === y ? '=' : !y ? 'novo' : t}</strong></td>`; };
-  // KPIs
-  const kp = [`<div><b>${fmtN(a)}</b><span>${esc(P.label)}${P.partial ? ' (até hoje)' : ''}</span></div>`,
-    ...cmps.map(c => `<div><b>${fmtN(c.n)}</b><span>${esc(c.name)}: ${esc(c.label)}</span><em class="${c.v[0]}">${c.v[1]}</em></div>`),
-    `<div><b>${(a / (A.length || 1)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</b><span>Média por mês</span></div>`];
-  let html = repHead('Relatório de Homicídios', `<strong>Período:</strong> ${esc(P.label)}${P.partial ? ' (até hoje)' : ''}${cmps.length ? ` · <strong>Comparações:</strong> ${cmps.map(c => esc(c.label)).join(' e ')}` : ''}`, [city || 'Todos os municípios', nb ? 'Bairro: ' + nb : ''].filter(Boolean).join(' · '));
-  html += `<h3>Resumo</h3><p class="rep-text">${esc(txt)}</p><div class="rep-kpis">${kp.slice(0, 4).join('')}</div>`;
-  if (cmps.length) {
-    html += `<h3>Comparações do período</h3><table><thead><tr><th>Comparação</th><th>Período</th><th class="n">Vítimas</th><th class="n">Período marcado</th><th class="n">Diferença</th><th class="n">Variação</th></tr></thead><tbody>
-      ${cmps.map(c => `<tr><td>${esc(c.name)}</td><td>${esc(c.label)}</td><td class="n">${fmtN(c.n)}</td><td class="n"><strong>${fmtN(a)}</strong></td>${vcell(a, c.n)}</tr>`).join('')}</tbody></table>`;
+  // nº de homicídios (ocorrências): onde vale o site, conta os casos; onde vale a planilha, 1 por vítima
+  const occ = ms => ms.reduce((a, ym) => a + cities.reduce((b, c) => {
+    const k = ym + '|' + c, p = I.P.get(k) || 0, q = I.Q.get(k) || 0;
+    if (nb || q > p) return b + homCases().filter(r => r.date.slice(0, 7) === ym && r.city === c && (!nb || r.neighborhood === nb)).length;
+    return b + p;
+  }, 0), 0);
+  const Y = A.map(minusYear), hasY = P.per !== 'tudo' && Y.length && Y[0] >= first, yb = Y.length ? Y[Y.length - 1].slice(0, 4) : '';
+  const a = tot(A), b = hasY ? tot(Y) : null, d = hasY ? a - b : 0, nOcc = occ(A);
+  const markS = (x, y) => x === y ? '<span class="mk eq">=</span>' : `<span class="mk ${x > y ? 'up' : 'down'}">${x > y ? '▲ +' : '▼ −'}${fmtN(Math.abs(x - y))}${y ? '<br>' + pct((x - y) / y * 100) : ''}</span>`;
+  const mark = (x, y) => x === y ? '<span class="mk eq">= igual</span>' : x > y ? `<span class="mk up">▲ +${fmtN(x - y)}${y ? ' (' + pct((x - y) / y * 100) + ')' : ''}</span>` : `<span class="mk down">▼ −${fmtN(y - x)} (${pct((y - x) / y * 100)})</span>`;
+  const munTxt = allSel ? 'Todos os municípios' : cities.join(', ');
+  const perTxt = `${P.label}${P.partial ? ' (até hoje)' : ''}`;
+  let html = repHead('Relatório de Homicídios', `<strong>Período:</strong> ${esc(perTxt)}${hasY ? ` · <strong>Comparação:</strong> mesmo período de ${yb}` : ''}`, (nb ? 'Bairro: ' + nb + ' · ' : '') + munTxt);
+  // 1. números do período
+  const verdict = !hasY ? '<div class="hr-v eq"><b>Sem comparação</b><span>sem dados do ano anterior</span></div>'
+    : d === 0 ? '<div class="hr-v eq"><b>= Estável</b><span>mesmo número de ' + yb + '</span></div>'
+    : `<div class="hr-v ${d > 0 ? 'up' : 'down'}"><b>${d > 0 ? '▲ Aumento' : '▼ Redução'}${b ? ' de ' + pct(d / b * 100) : ''}</b><span>${d > 0 ? '+' : '−'}${pl(Math.abs(d), 'vítima', 'vítimas')} em relação a ${yb}</span></div>`;
+  html += `<div class="hr-top">
+    <div class="hr-n"><span>Homicídios no período</span><b>${fmtN(nOcc)}</b></div>
+    <div class="hr-n"><span>Vítimas no período</span><b>${fmtN(a)}</b></div>
+    <div class="hr-n muted-n"><span>Vítimas no mesmo período de ${yb || 'ano anterior'}</span><b>${hasY ? fmtN(b) : '–'}</b></div>
+    ${verdict}</div>`;
+  // 2. gráfico mês a mês com a marca de aumento/redução
+  if (A.length) {
+    const cv = A.map(m => tot([m])), pv = hasY ? Y.map(m => tot([m])) : A.map(() => 0), top = Math.max(1, ...cv, ...pv);
+    const multi = A[0].slice(0, 4) !== A[A.length - 1].slice(0, 4);
+    html += `<h3>Vítimas por mês — ${esc(perTxt)}${hasY ? ' × mesmo período de ' + yb : ''}</h3>
+      <div class="hr-bars">${A.map((m, i) => `<div class="hb"><div class="hb-cols">${hasY ? `<div class="col p" data-h="${pv[i] / top * 100}"><i>${pv[i]}</i></div>` : ''}<div class="col c" data-h="${cv[i] / top * 100}"><i>${cv[i]}</i></div></div>
+        <div class="hb-l">${MESES[+m.slice(5) - 1]}${multi ? '/' + m.slice(2, 4) : ''}</div>${hasY ? `<div class="hb-m">${markS(cv[i], pv[i])}</div>` : ''}</div>`).join('')}</div>
+      ${hasY ? `<p class="legend"><i class="p"></i>${yb}<i class="c"></i>${A[A.length - 1].slice(0, 4)} · abaixo de cada mês: aumento ▲ ou redução ▼ em relação ao mesmo mês de ${yb}</p>` : ''}`;
   }
-  // por município, com as comparações
-  const rows = cities.map(c => [c, val(A, c), ...cmps.map(x => val(x.ms, c))]).filter(r => r.slice(1).some(Boolean)).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
-  if (rows.length && !nb) {
-    html += `<h3>Por município</h3><table class="matrix"><thead><tr><th>Município</th><th class="n">Período</th>${cmps.map(c => `<th class="n">${c.key === 'prev' ? 'Per. anterior' : 'Ano anterior'}</th><th class="n">Dif.</th><th class="n">Var.</th>`).join('')}</tr></thead><tbody>
-      ${rows.map(r => `<tr><td>${esc(r[0])}</td><td class="n"><strong>${fmtN(r[1])}</strong></td>${cmps.map((c, i) => `<td class="n">${fmtN(r[2 + i])}</td>${vcell(r[1], r[2 + i])}`).join('')}</tr>`).join('')}
-      <tr class="total"><td>Total</td><td class="n">${fmtN(a)}</td>${cmps.map(c => `<td class="n">${fmtN(c.n)}</td>${vcell(a, c.n)}`).join('')}</tr></tbody></table>`;
+  // 3. o mesmo período em cada ano
+  if (P.per !== 'tudo') {
+    const cur = today().slice(0, 7), ys = homYears().filter(y => ymKey(y, +A[0].slice(5)) >= first && y <= +A[A.length - 1].slice(0, 4));
+    const off = +A[A.length - 1].slice(0, 4);
+    const yv = ys.map(y => tot(A.map(m => ymKey(+m.slice(0, 4) - (off - y), +m.slice(5))).filter(m => m <= cur)));
+    const top = Math.max(1, ...yv);
+    if (ys.length > 1) html += `<h3>Mesmo período em cada ano</h3><div class="hr-years">${ys.map((y, i) => `<div class="hy${y === off ? ' on' : ''}"><div class="hy-col"><div class="col" data-h="${yv[i] / top * 100}"><i>${yv[i]}</i></div></div><div class="hb-l">${y}</div>${i ? `<div class="hb-m">${markS(yv[i], yv[i - 1])}</div>` : '<div class="hb-m"></div>'}</div>`).join('')}</div>
+      <p class="legend">Abaixo de cada ano: variação em relação ao ano anterior.</p>`;
   }
-  // mês a mês (período × ano anterior)
-  const yc = cmps.find(c => c.key === 'year');
-  if (A.length > 1) {
-    html += `<h3>Mês a mês${yc ? ' — comparado ao ano anterior' : ''}</h3><table><thead><tr><th>Mês</th><th class="n">Vítimas</th>${yc ? '<th class="n">Ano anterior</th><th class="n">Diferença</th><th class="n">Variação</th>' : ''}</tr></thead><tbody>
-      ${A.map((m, i) => `<tr><td>${ymLabel(m)}</td><td class="n"><strong>${fmtN(tot([m]))}</strong></td>${yc ? `<td class="n">${fmtN(tot([yc.ms[i]]))}</td>${vcell(tot([m]), tot([yc.ms[i]]))}` : ''}</tr>`).join('')}</tbody></table>`;
+  // 4. ranking dos municípios marcados
+  if (!nb) {
+    const rows = cities.map(c => [c, val(A, c), hasY ? val(Y, c) : null]).sort((x, y) => y[1] - x[1] || (x[2] ?? 0) - (y[2] ?? 0) || x[0].localeCompare(y[0]));
+    html += `<h3>Ranking dos municípios</h3><table class="hr-rank"><thead><tr><th class="n">#</th><th>Município</th><th class="n">Vítimas</th>${hasY ? `<th class="n">${yb}</th><th>Aumento / redução</th>` : ''}</tr></thead><tbody>
+      ${rows.map(([c, x, y], i) => `<tr><td class="n">${i + 1}º</td><td><strong>${esc(c)}</strong></td><td class="n"><strong>${fmtN(x)}</strong></td>${hasY ? `<td class="n">${fmtN(y)}</td><td>${mark(x, y)}</td>` : ''}</tr>`).join('')}
+      <tr class="total"><td></td><td>Total</td><td class="n">${fmtN(a)}</td>${hasY ? `<td class="n">${fmtN(b)}</td><td>${mark(a, b)}</td>` : ''}</tr></tbody></table>`;
   }
-  if (P.per === 'tudo') {
-    const ys = homYears(), cur = today().slice(0, 7);
-    html += `<h3>Por ano</h3><table><thead><tr><th>Ano</th><th class="n">Vítimas</th><th class="n">Diferença</th><th class="n">Variação</th></tr></thead><tbody>${ys.map((y, i) => { const v = tot(monthsRange(y + '-01', y + '-12').filter(m => m <= cur)), pv = i ? tot(monthsRange(ys[i - 1] + '-01', ys[i - 1] + '-12')) : null; return `<tr><td>${y}${String(y) === cur.slice(0, 4) ? ' (até hoje)' : ''}</td><td class="n"><strong>${fmtN(v)}</strong></td>${pv === null ? '<td></td><td></td>' : vcell(v, pv)}</tr>`; }).join('')}</tbody></table>`;
-  }
-  // casos lançados no site
-  if (cases.length) {
-    const grp = fn => { const m = new Map(); cases.forEach(r => { const k = fn(r) || 'Não informado'; m.set(k, (m.get(k) || 0) + vit(r)); }); return [...m].sort((x, y) => y[1] - x[1]); };
-    const small = (t, arr) => `<div><h3>${t}</h3><table><tbody>${arr.slice(0, 10).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="n">${fmtN(v)}</td></tr>`).join('')}</tbody></table></div>`;
-    html += `<div class="rep-grid">${small('Por bairro (casos lançados no site)', grp(r => r.neighborhood + (city ? '' : ', ' + r.city)))}${small('Meio empregado', grp(r => r.meio))}${small('Por CIA', grp(r => r.cia))}${small('Faixa de horário', grp(r => { const h = +(r.time || '').slice(0, 2); return !r.time ? '' : h < 6 ? '00h–06h' : h < 12 ? '06h–12h' : h < 18 ? '12h–18h' : '18h–24h'; }))}</div>`;
-    html += `<h3>Relação dos casos lançados no site (${fmtN(cases.length)})</h3><table><thead><tr><th>Data</th><th>Hora</th><th>Nº</th><th>Município</th><th>Bairro</th><th>CIA</th><th>Meio</th><th class="n">Vítimas</th></tr></thead><tbody>${cases.map(r => `<tr><td class="nowrap">${fmtD(r.date)}</td><td>${esc(r.time)}</td><td>${esc(r.ref)}</td><td>${esc(r.city)}</td><td>${esc(r.neighborhood)}</td><td>${esc(r.cia)}</td><td>${esc(r.meio || '')}</td><td class="n">${vit(r)}</td></tr>`).join('')}</tbody></table>`;
-  }
-  html += `<p class="muted small">Fonte: planilha de homicídios do 20º BPM (2023 em diante) + casos lançados no site. No mesmo mês e município vale o maior número das duas fontes.${nb ? ' Com bairro escolhido, a contagem usa só os casos lançados no site.' : ''}</p>` + repFoot();
+  html += `<p class="muted small">Fonte: planilha de homicídios do 20º BPM + casos lançados no site.${nb ? ' Com bairro escolhido, conta só os casos lançados no site.' : ''}</p>` + repFoot();
   $('#homReport').innerHTML = html;
+  $$('#homReport [data-h]').forEach(e => { e.style.height = (+e.dataset.h || 0) + '%'; });
 }
 function printHom() {
+  if (!$$('#hRepCities input').some(x => x.checked)) return notify('Marque pelo menos um município para o relatório.', 'error');
   renderHomReport();
   document.body.classList.add('print-hom');
   const off = () => { document.body.classList.remove('print-hom'); window.removeEventListener('afterprint', off); };
@@ -1967,8 +2015,10 @@ function bind() {
     if (e.target.closest('[data-remove]')) removeRec(tr.dataset.id);
   });
   $('#btnBk').addEventListener('click', importBackup);
-  ['#hPer', '#hYear', '#hQ', '#hS', '#hMonth', '#hCity', '#hNb'].forEach(id => $(id).addEventListener('change', () => { if (id === '#hCity') $('#hNb').value = ''; if (!['#hCity', '#hNb'].includes(id)) S.cmpFollow = true; renderHom(); }));
+  ['#hPer', '#hYear', '#hQ', '#hS', '#hMonth', '#hCity', '#hNb'].forEach(id => $(id).addEventListener('change', () => { if (id === '#hCity') { $('#hNb').value = ''; syncRepCities(); } if (!['#hCity', '#hNb'].includes(id)) S.cmpFollow = true; renderHom(); }));
   $('#hPrint').addEventListener('click', printHom);
+  $('#hPrint2').addEventListener('click', printHom);
+  $('#hRepAll').addEventListener('click', () => { const ins = $$('#hRepCities input'), on = !ins.every(x => x.checked); ins.forEach(x => { x.checked = on; }); });
   ['#cA1', '#cA2'].forEach(id => $(id).addEventListener('change', () => { S.cmpFollow = false; renderCmp(); }));
   $('#cReset').addEventListener('click', () => { S.cmpFollow = true; renderCmp(); });
   $('#formHom').addEventListener('submit', saveHom);
