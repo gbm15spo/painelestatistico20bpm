@@ -366,6 +366,42 @@ def api_cvli_import():
     return jsonify({'ok':True,'rows':len(rows),'years':years,'total':sum(r['total'] for r in rows)})
 
 
+
+@app.post('/api/cvli/save')
+def api_cvli_save():
+    # Edição manual dos números da planilha (somente Administrador). Recebe só as células alteradas.
+    s=boss()
+    if not s:return no_access('Somente o administrador pode editar os números da planilha.',403)
+    body=json_body()
+    try:year=int(body.get('year'))
+    except (TypeError,ValueError):raise ValueError('Ano inválido.')
+    if not 2000<=year<=2100:raise ValueError('Ano inválido.')
+    vals=body.get('values')
+    if not isinstance(vals,list) or not vals:raise ValueError('Nenhuma alteração enviada.')
+    if len(vals)>600:raise ValueError('Alterações demais de uma vez.')
+    cur=dt.datetime.now(dt.timezone(dt.timedelta(hours=-3)))
+    rows=[]
+    for v in vals:
+        if not isinstance(v,dict):raise ValueError('Formato inválido.')
+        city=norm_city(str(v.get('municipio') or '')[:80])
+        if not city:raise ValueError('Município inválido.')
+        try:month=int(v.get('month'));total=int(v.get('total'))
+        except (TypeError,ValueError):raise ValueError('Mês ou número inválido.')
+        if not 1<=month<=12:raise ValueError('Mês inválido.')
+        if not 0<=total<=999:raise ValueError(f'Número inválido para {city} ({month:02d}/{year}).')
+        if (year,month)>(cur.year,cur.month):raise ValueError('Não é possível lançar números em meses futuros.')
+        rows.append({'year':year,'month':month,'municipio':city,'total':total})
+    t=now_iso();changes=[]
+    with database().begin() as c:
+        for r in rows:
+            old=c.execute(text('SELECT total FROM cvli_monthly WHERE year=:year AND month=:month AND municipio=:municipio'),r).scalar()
+            if old is not None and int(old)==r['total']:continue
+            c.execute(text('''INSERT INTO cvli_monthly(year,month,municipio,total,source,updated_at) VALUES(:year,:month,:municipio,:total,'Edição manual',:t)
+              ON CONFLICT(year,month,municipio) DO UPDATE SET total=excluded.total,source=excluded.source,updated_at=excluded.updated_at'''),{**r,'t':t})
+            changes.append(f"{r['municipio']} {r['month']:02d}/{year}: {0 if old is None else int(old)} → {r['total']}")
+        if changes:log(c,s['username'],'Editou números de homicídios',str(year),'; '.join(changes)[:1900])
+    return jsonify({'ok':True,'changed':len(changes)})
+
 @app.get('/api/geo')
 def api_geo():
     # Posição (lat/lon) de cada bairro para o mapa. Não contém dados de ocorrências.

@@ -354,6 +354,25 @@ td.site{background:#fbeaea;font-weight:700}
 #homReport .rep-foot{margin-top:10px}
 #homReport .rep-meta{margin-bottom:8px}
 #homReport .hb-cols{height:110px}#homReport .hy-col{height:70px}
+
+/* Período do relatório de homicídios em destaque */
+.hr-per{display:grid;grid-template-columns:1.25fr 1fr;gap:10px;margin:10px 0 6px}
+.hr-per>div{border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;gap:1px}
+.hr-per span{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.hr-per b{font-size:1.3rem;line-height:1.2}
+.hr-per em{font-style:normal;font-size:1.05rem;font-weight:700}
+.hr-per-a{background:#1b1913;color:#fff}.hr-per-a span{color:#c3b091}.hr-per-a em{color:#fff}
+.hr-per-b{background:#f1ece0;color:#14130f;border:1px solid #d6ccb0}.hr-per-b span{color:#6d6551}.hr-per-b em{color:#5f5126}
+.hr-mun{margin:4px 0 0;font-size:.85rem}
+.hr-n span small{font-size:.72rem;text-transform:none;letter-spacing:0;font-weight:600;color:#5f5126}
+@media (max-width:700px){.hr-per{grid-template-columns:1fr}}
+
+/* Edição dos números da planilha */
+.ce input{width:44px;padding:4px 2px;text-align:center;font-size:.85rem}
+.ce input.chg{background:#fff4c2;border-color:#c9a227;font-weight:700}
+.ce input:disabled{background:transparent;border-color:transparent}
+.ce td{padding:3px 2px}.ce td:first-child{white-space:nowrap;padding-right:8px}
+#ceAdd{max-width:240px}
 </style>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js" integrity="sha256-65UqrlgGoRAnKfKRuriH3eeDrOhZgZo1SCenduc+SGo=" crossorigin="" defer></script>
@@ -489,6 +508,13 @@ td.site{background:#fbeaea;font-weight:700}
       <div class="ed-body"></div>
       <div class="actions"><button type="submit" class="btn primary">Salvar homicídio</button></div>
     </form>
+    <div class="card noprint hidden" data-role="admin">
+      <div class="card-h"><h2>Editar números da planilha <span class="muted small">(somente Administrador)</span></h2></div>
+      <p class="muted small">Números de vítimas por município e mês, como na planilha. Os casos lançados no site não aparecem aqui: eles continuam somando pela regra do maior número. Toda alteração fica registrada na Auditoria.</p>
+      <div class="row-inline"><label>Ano<select id="ceYear"></select></label><select id="ceAdd" aria-label="Incluir município"></select></div>
+      <div id="ceGrid" class="table-wrap"></div>
+      <div class="row-inline"><button type="button" class="btn ghost" id="ceUndo">Desfazer alterações</button><button type="button" class="btn primary" id="ceSave">Salvar alterações</button></div>
+    </div>
     <div class="card noprint hidden" data-auth>
       <h2>Atualizar planilha de homicídios</h2>
       <p class="muted">Envie uma nova versão da planilha de homicídios (.xlsx, no mesmo formato). Os meses e municípios que estiverem na planilha substituem os anteriores.</p>
@@ -784,7 +810,7 @@ function showTab(name) {
   if (name === 'usuarios') loadUsers();
   if (name === 'auditoria') loadAudit();
   if (name === 'painel') { if (map) map.invalidateSize(); renderDashboard(); }
-  if (name === 'homicidios') renderHom();
+  if (name === 'homicidios') { renderHom(); if (S.role === 'admin' && !$('#ceGrid').children.length) renderCvliEdit(); }
 }
 
 async function loadRecords() {
@@ -1707,6 +1733,7 @@ function vbarsPair(box, labels, cur, prev, hl) {
 function renderHom() {
   if (!$('#tab-homicidios')) return;
   fillHomFilters(); fillRepCities();
+  if (S.role === 'admin' && $('#ceGrid') && !$('#ceGrid').children.length) renderCvliEdit();
   const P = homPeriod(), city = $('#hCity').value, nb = $('#hNb').value, I = homIndex(nb);
   const cities = city ? [city] : homCities();
   const sumMonths = ms => ms.reduce((a, ym) => a + cities.reduce((b, c) => b + homValue(I, ym, c, nb), 0), 0);
@@ -1870,21 +1897,27 @@ function renderHomReport() {
   const mark = (x, y) => x === y ? '<span class="mk eq">= igual</span>' : x > y ? `<span class="mk up">▲ +${fmtN(x - y)}${y ? ' (' + pct((x - y) / y * 100) + ')' : ''}</span>` : `<span class="mk down">▼ −${fmtN(y - x)} (${pct((y - x) / y * 100)})</span>`;
   const munTxt = allSel ? 'Todos os municípios' : cities.join(', ');
   const perTxt = `${P.label}${P.partial ? ' (até hoje)' : ''}`;
-  let html = repHead('Relatório de Homicídios', `<strong>Período:</strong> ${esc(perTxt)}${hasY ? ` · <strong>Comparação:</strong> mesmo período de ${yb}` : ''}`, (nb ? 'Bairro: ' + nb + ' · ' : '') + munTxt);
+  // datas exatas do período (no mês corrente, até hoje)
+  const dRange = ms => { if (!ms.length) return ['', '']; const l = ms[ms.length - 1], end = l === today().slice(0, 7) ? today() : isoU(new Date(Date.UTC(+l.slice(0, 4), +l.slice(5), 0))); return [ms[0] + '-01', end]; };
+  const [da, db] = dRange(A), [ya1, ya2] = hasY ? dRange(Y) : ['', ''];
+  const shortD = (x, y) => x.slice(0, 4) === y.slice(0, 4) ? `${fmtD(x).slice(0, 5)} a ${fmtD(y)}` : `${fmtD(x)} a ${fmtD(y)}`;
+  let html = repHead('Relatório de Homicídios', `<strong>Período:</strong> ${fmtD(da)} a ${fmtD(db)}`, '');
+  html += `<div class="hr-per"><div class="hr-per-a"><span>Dados do período</span><b>${esc(perTxt)}</b><em>de ${fmtD(da)} a ${fmtD(db)}</em></div>${hasY ? `<div class="hr-per-b"><span>Comparado com</span><b>mesmo período de ${yb}</b><em>de ${fmtD(ya1)} a ${fmtD(ya2)}</em></div>` : ''}</div>
+    <p class="hr-mun"><strong>Municípios:</strong> ${esc(munTxt)}${nb ? ` · <strong>Bairro:</strong> ${esc(nb)}` : ''}</p>`;
   // 1. números do período
   const verdict = !hasY ? '<div class="hr-v eq"><b>Sem comparação</b><span>sem dados do ano anterior</span></div>'
     : d === 0 ? '<div class="hr-v eq"><b>= Estável</b><span>mesmo número de ' + yb + '</span></div>'
     : `<div class="hr-v ${d > 0 ? 'up' : 'down'}"><b>${d > 0 ? '▲ Aumento' : '▼ Redução'}${b ? ' de ' + pct(d / b * 100) : ''}</b><span>${d > 0 ? '+' : '−'}${pl(Math.abs(d), 'vítima', 'vítimas')} em relação a ${yb}</span></div>`;
   html += `<div class="hr-top">
-    <div class="hr-n"><span>Homicídios no período</span><b>${fmtN(nOcc)}</b></div>
-    <div class="hr-n"><span>Vítimas no período</span><b>${fmtN(a)}</b></div>
-    <div class="hr-n muted-n"><span>Vítimas no mesmo período de ${yb || 'ano anterior'}</span><b>${hasY ? fmtN(b) : '–'}</b></div>
+    <div class="hr-n"><span>Homicídios<br><small>${shortD(da, db)}</small></span><b>${fmtN(nOcc)}</b></div>
+    <div class="hr-n"><span>Vítimas<br><small>${shortD(da, db)}</small></span><b>${fmtN(a)}</b></div>
+    <div class="hr-n muted-n"><span>Vítimas no ano anterior<br><small>${hasY ? shortD(ya1, ya2) : 'sem dados'}</small></span><b>${hasY ? fmtN(b) : '–'}</b></div>
     ${verdict}</div>`;
   // 2. gráfico mês a mês com a marca de aumento/redução
   if (A.length) {
     const cv = A.map(m => tot([m])), pv = hasY ? Y.map(m => tot([m])) : A.map(() => 0), top = Math.max(1, ...cv, ...pv);
     const multi = A[0].slice(0, 4) !== A[A.length - 1].slice(0, 4);
-    html += `<h3>Vítimas por mês — ${esc(perTxt)}${hasY ? ' × mesmo período de ' + yb : ''}</h3>
+    html += `<h3>Vítimas por mês — ${fmtD(da)} a ${fmtD(db)}${hasY ? ` × ${fmtD(ya1)} a ${fmtD(ya2)}` : ''}</h3>
       <div class="hr-bars">${A.map((m, i) => `<div class="hb"><div class="hb-cols">${hasY ? `<div class="col p" data-h="${pv[i] / top * 100}"><i>${pv[i]}</i></div>` : ''}<div class="col c" data-h="${cv[i] / top * 100}"><i>${cv[i]}</i></div></div>
         <div class="hb-l">${MESES[+m.slice(5) - 1]}${multi ? '/' + m.slice(2, 4) : ''}</div>${hasY ? `<div class="hb-m">${markS(cv[i], pv[i])}</div>` : ''}</div>`).join('')}</div>
       ${hasY ? `<p class="legend"><i class="p"></i>${yb}<i class="c"></i>${A[A.length - 1].slice(0, 4)} · abaixo de cada mês: aumento ▲ ou redução ▼ em relação ao mesmo mês de ${yb}</p>` : ''}`;
@@ -1901,11 +1934,11 @@ function renderHomReport() {
   // 4. ranking dos municípios marcados
   if (!nb) {
     const rows = cities.map(c => [c, val(A, c), hasY ? val(Y, c) : null]).sort((x, y) => y[1] - x[1] || (x[2] ?? 0) - (y[2] ?? 0) || x[0].localeCompare(y[0]));
-    html += `<h3>Ranking dos municípios</h3><table class="hr-rank"><thead><tr><th class="n">#</th><th>Município</th><th class="n">Vítimas</th>${hasY ? `<th class="n">${yb}</th><th>Aumento / redução</th>` : ''}</tr></thead><tbody>
+    html += `<h3>Ranking dos municípios — ${fmtD(da)} a ${fmtD(db)}</h3><table class="hr-rank"><thead><tr><th class="n">#</th><th>Município</th><th class="n">Vítimas</th>${hasY ? `<th class="n">${yb}</th><th>Aumento / redução</th>` : ''}</tr></thead><tbody>
       ${rows.map(([c, x, y], i) => `<tr><td class="n">${i + 1}º</td><td><strong>${esc(c)}</strong></td><td class="n"><strong>${fmtN(x)}</strong></td>${hasY ? `<td class="n">${fmtN(y)}</td><td>${mark(x, y)}</td>` : ''}</tr>`).join('')}
       <tr class="total"><td></td><td>Total</td><td class="n">${fmtN(a)}</td>${hasY ? `<td class="n">${fmtN(b)}</td><td>${mark(a, b)}</td>` : ''}</tr></tbody></table>`;
   }
-  html += `<p class="muted small">Fonte: planilha de homicídios do 20º BPM + casos lançados no site.${nb ? ' Com bairro escolhido, conta só os casos lançados no site.' : ''}</p>` + repFoot();
+  html += `<p class="muted small">Fonte: planilha de homicídios do 20º BPM + casos lançados no site. Os números são mensais${P.partial ? '; no mês em curso entram os casos até hoje' : ''}.${nb ? ' Com bairro escolhido, conta só os casos lançados no site.' : ''}</p>` + repFoot();
   $('#homReport').innerHTML = html;
   $$('#homReport [data-h]').forEach(e => { e.style.height = (+e.dataset.h || 0) + '%'; });
 }
@@ -1933,6 +1966,47 @@ async function saveHom(ev) {
 function mountHomForm() {
   mountEditor($('#formHom'), { date: today(), crime_category: 'homicidio', kind: 'Homicídio', grupo: 'policial', vitimas: 1, cvli_tipo: 'Homicídio', meio: 'Não informado', source: 'Cadastro manual (aba Homicídios)' });
 }
+/* Edição manual dos números da planilha (somente Administrador) */
+const HOM_ALL = ['Abaré', 'Antas', 'Chorrochó', 'Coronel João Sá', 'Glória', 'Jeremoabo', 'Macururé', 'Novo Triunfo', 'Paulo Afonso', 'Pedro Alexandre', 'Rodelas', 'Santa Brígida', 'Sítio do Quinto'];
+function renderCvliEdit(keepYear) {
+  const sel = $('#ceYear'); if (!sel) return;
+  const ys = homYears(), v = keepYear || sel.value || String(ys[ys.length - 1]);
+  sel.innerHTML = ys.map(y => `<option>${y}</option>`).join(''); sel.value = v;
+  const y = +sel.value, cur = today().slice(0, 7);
+  const data = new Map(S.cvli.filter(x => x.year === y).map(x => [x.municipio + '|' + x.month, x.total]));
+  const extra = (S.ceExtra || []).filter(c => !S.cvli.some(x => x.year === y && x.municipio === c));
+  const cities = uniq([...S.cvli.filter(x => x.year === y).map(x => x.municipio), ...extra]);
+  $('#ceAdd').innerHTML = '<option value="">+ Incluir município…</option>' + HOM_ALL.filter(c => !cities.includes(c)).map(c => `<option>${esc(c)}</option>`).join('');
+  $('#ceGrid').innerHTML = `<table class="matrix ce"><thead><tr><th>Município</th>${MESES.map(m => `<th class="n">${m}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>${cities.map(c => {
+    const cells = MESES.map((_, i) => { const m = i + 1, fut = ymKey(y, m) > cur, val = data.get(c + '|' + m); return `<td><input type="number" min="0" max="999" step="1" inputmode="numeric" data-c="${esc(c)}" data-m="${m}" data-o="${val ?? ''}" value="${fut ? '' : val ?? 0}"${fut ? ' disabled' : ''}></td>`; }).join('');
+    return `<tr><td><strong>${esc(c)}</strong></td>${cells}<td class="n ce-t"></td></tr>`; }).join('')}
+    <tr class="total"><td>Total</td>${MESES.map((_, i) => `<td class="n ce-mt" data-m="${i + 1}"></td>`).join('')}<td class="n ce-gt"></td></tr></tbody></table>`;
+  ceTotals();
+}
+function ceTotals() {
+  const ins = $$('#ceGrid input'); let gt = 0; const mt = Array(13).fill(0);
+  $$('#ceGrid tbody tr:not(.total)').forEach(tr => { let t = 0; $$('input', tr).forEach(i => { const v = +i.value || 0; t += v; mt[+i.dataset.m] += v; }); $('.ce-t', tr).textContent = fmtN(t); gt += t; });
+  $$('#ceGrid .ce-mt').forEach(td => { td.textContent = fmtN(mt[+td.dataset.m]); });
+  const g = $('#ceGrid .ce-gt'); if (g) g.textContent = fmtN(gt);
+  const isChg = i => !i.disabled && (+i.value || 0) !== (i.dataset.o === '' ? 0 : +i.dataset.o), ch = ins.filter(isChg);
+  ins.forEach(i => i.classList.toggle('chg', isChg(i)));
+  $('#ceSave').textContent = ch.length ? `Salvar ${pl(ch.length, 'alteração', 'alterações')}` : 'Salvar alterações';
+}
+async function saveCvliEdit() {
+  const y = +$('#ceYear').value;
+  const values = $$('#ceGrid input').filter(i => !i.disabled && (+i.value || 0) !== (i.dataset.o === '' ? 0 : +i.dataset.o))
+    .map(i => ({ municipio: i.dataset.c, month: +i.dataset.m, total: Math.max(0, Math.round(+i.value || 0)) }));
+  if (!values.length) return notify('Nenhum número foi alterado.', 'info');
+  if (values.some(v => v.total > 999)) return notify('Número muito alto em uma das células.', 'error');
+  const btn = $('#ceSave'); btn.disabled = true;
+  try {
+    const j = await api('/api/cvli/save', { method: 'POST', body: { year: y, values } });
+    notify(`${pl(j.changed, 'número atualizado', 'números atualizados')} em ${y}. A alteração ficou registrada na Auditoria.`);
+    S.ceExtra = []; await loadCvli(); renderHom(); renderCvliEdit(String(y));
+  } catch (e) { notify(e.message, 'error'); }
+  finally { btn.disabled = false; }
+}
+
 async function importCvli() {
   const f = $('#cvliFile').files[0];
   if (!f) return notify('Escolha a planilha de homicídios (.xlsx).', 'error');
@@ -1941,7 +2015,7 @@ async function importCvli() {
   try {
     const j = await api('/api/cvli/import?name=' + encodeURIComponent(f.name), { method: 'POST', raw: await f.arrayBuffer(), type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     notify(`Planilha importada: ${j.rows} valores mensais (${j.years.join(', ')}), total de ${j.total} vítimas.`); $('#cvliFile').value = '';
-    await loadCvli(); renderHom();
+    await loadCvli(); renderHom(); renderCvliEdit();
   } catch (e) { notify(e.message, 'error'); }
   finally { btn.disabled = false; }
 }
@@ -2023,6 +2097,11 @@ function bind() {
   $('#cReset').addEventListener('click', () => { S.cmpFollow = true; renderCmp(); });
   $('#formHom').addEventListener('submit', saveHom);
   $('#btnCvli').addEventListener('click', importCvli);
+  $('#ceYear').addEventListener('change', () => { S.ceExtra = []; renderCvliEdit(); });
+  $('#ceGrid').addEventListener('input', ceTotals);
+  $('#ceAdd').addEventListener('change', e => { if (!e.target.value) return; (S.ceExtra = S.ceExtra || []).push(e.target.value); renderCvliEdit($('#ceYear').value); });
+  $('#ceSave').addEventListener('click', saveCvliEdit);
+  $('#ceUndo').addEventListener('click', () => { S.ceExtra = []; renderCvliEdit($('#ceYear').value); });
   $('#hCases').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if (tr && e.target.closest('[data-hedit]')) openEdit(tr.dataset.id); });
   document.addEventListener('change', e => { if (e.target.matches('select[name=crime_category]')) { const box = $('.hom-box', e.target.closest('.editor') || document); if (box) box.classList.toggle('hidden', !['homicidio', 'tentativa_homicidio'].includes(e.target.value)); } });
   $('#formUser').addEventListener('submit', createUser);
