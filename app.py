@@ -470,6 +470,18 @@ def api_export_pdf():
     return Response(b,content_type='application/pdf',headers={'Content-Disposition':'attachment; filename="planilha_ocorrencias_20bpm.pdf"'})
 
 
+
+@app.post('/api/podio')
+def api_podio():
+    # Arte do pódio de produtividade por CIA para Instagram (PDF ou PNG). Os números vêm do relatório já filtrado na tela.
+    s=admin()
+    if not s:return no_access()
+    fmt='png' if request.args.get('fmt')=='png' else 'pdf'
+    from podio_art import build
+    b=build(json_body(),fmt)
+    name='podio_produtividade_20bpm.'+fmt
+    return Response(b,content_type='image/png' if fmt=='png' else 'application/pdf',headers={'Content-Disposition':f'attachment; filename="{name}"','Cache-Control':'no-store'})
+
 @app.post('/api/login')
 def api_login():
     if not ADMIN_USERNAME or not ADMIN_PASSWORD_HASH:
